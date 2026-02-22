@@ -6,7 +6,7 @@ import { registerPush } from '@/lib/push'
 import type { User } from '@supabase/supabase-js'
 import styles from './page.module.css'
 
-type Screen = 'landing' | 'login' | 'signup' | 'forgot-password' | 'couple-setup' | 'home' | 'settings'
+type Screen = 'landing' | 'login' | 'signup' | 'forgot-password' | 'reset-password' | 'couple-setup' | 'home' | 'settings'
 type CoupleStatus = 'none' | 'pending-send' | 'pending-receive' | 'linked'
 
 interface Profile {
@@ -146,12 +146,20 @@ export default function App() {
     setProfile(p => p ? { ...p, couple_id: null } : p)
     setScreen('couple-setup')
   }
-
+// Catch password reset redirect from Supabase email
+  useEffect(() => {
+    const hash = window.location.hash
+    if (hash.includes('type=recovery')) {
+      setScreen('reset-password')
+      setLoading(false)
+    }
+  }, [])
   if (loading) return <Splash />
   if (screen === 'landing') return <Landing onLogin={() => setScreen('login')} onSignup={() => setScreen('signup')} />
   if (screen === 'login') return <Login onBack={() => setScreen('landing')} onForgot={() => setScreen('forgot-password')} onSuccess={() => {}} />
   if (screen === 'signup') return <Signup onBack={() => setScreen('landing')} onSuccess={(u) => { setUser(u); enablePush(u.id) }} />
   if (screen === 'forgot-password') return <ForgotPassword onBack={() => setScreen('login')} />
+  if (screen === 'reset-password') return <ResetPassword onDone={() => setScreen('login')} />
   if (screen === 'couple-setup') return (
     <CoupleSetup
       userId={user?.id || ''}
@@ -551,5 +559,49 @@ function AuthShell({ title, onBack, children }: { title: string; onBack: () => v
         <div className={styles.authForm}>{children}</div>
       </div>
     </div>
+  )
+// ── RESET PASSWORD ───────────────────────────────────────────────────
+function ResetPassword({ onDone }: { onDone: () => void }) {
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [done, setDone] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!password || !confirm) return setError('Fill both fields.')
+    if (password.length < 6) return setError('Password needs 6+ characters.')
+    if (password !== confirm) return setError("Passwords don't match.")
+    setLoading(true); setError('')
+    const { error: updateError } = await supabase.auth.updateUser({ password })
+    if (updateError) { setError(updateError.message); setLoading(false) }
+    else setDone(true)
+  }
+
+  return (
+    <AuthShell title="New password." onBack={onDone}>
+      {done ? (
+        <div className={styles.sentMsg}>
+          <div className={styles.sentIcon}>✓</div>
+          <p>Password updated. You're good to go.</p>
+          <button className="btn" onClick={onDone} style={{marginTop:'1rem'}}>Sign in →</button>
+        </div>
+      ) : (
+        <>
+          <div className={styles.formGroup}>
+            <label className="label">New password</label>
+            <input className="input" type="password" placeholder="6+ characters" value={password} onChange={e => setPassword(e.target.value)} />
+          </div>
+          <div className={styles.formGroup}>
+            <label className="label">Confirm password</label>
+            <input className="input" type="password" placeholder="Same again" value={confirm} onChange={e => setConfirm(e.target.value)} />
+          </div>
+          {error && <p className="error-msg">{error}</p>}
+          <button className="btn" onClick={handleSubmit} disabled={loading}>
+            {loading ? 'Updating...' : 'Set new password →'}
+          </button>
+        </>
+      )}
+    </AuthShell>
   )
 }

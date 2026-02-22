@@ -9,7 +9,7 @@ export async function registerPush(): Promise<PushSubscription | null> {
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') return null;
 
-  const sub = await (reg.pushManager as any).subscribe({
+ const sub = await (reg.pushManager as any).subscribe({
 
     userVisibleOnly: true,
     applicationServerKey: vapidToUint8Array(

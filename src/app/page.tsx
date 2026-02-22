@@ -47,10 +47,16 @@ export default function App() {
       else setLoading(false)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-      if (session?.user) loadProfile(session.user.id)
-      else { setLoading(false); setScreen('landing') }
+   const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    setScreen('reset-password')
+    setLoading(false)
+    return
+  }
+  setUser(session?.user ?? null)
+  if (session?.user) loadProfile(session.user.id)
+  else { setLoading(false); setScreen('landing') }
+})
     })
     return () => subscription.unsubscribe()
   }, [])

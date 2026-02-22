@@ -76,3 +76,21 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
 }
+
+// DELETE /api/couple — remove partner linkage
+export async function DELETE(req: NextRequest) {
+  const { userId, coupleId } = await req.json()
+
+  // Remove couple_id from both profiles
+  const { data: couple } = await supabase
+    .from('couples').select('user1_id, user2_id').eq('id', coupleId).single()
+
+  if (!couple) return NextResponse.json({ error: 'Couple not found' }, { status: 404 })
+
+  await supabase.from('profiles').update({ couple_id: null })
+    .in('id', [couple.user1_id, couple.user2_id])
+
+  await supabase.from('couples').delete().eq('id', coupleId)
+
+  return NextResponse.json({ success: true })
+}

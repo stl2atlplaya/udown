@@ -30,6 +30,16 @@ export default function App() {
   const [coupleId, setCoupleId] = useState('')
   const [yesCount, setYesCount] = useState(0)
 
+  // Detect password reset redirect from Supabase email link
+  useEffect(() => {
+    const hash = window.location.hash
+    if (hash.includes('type=recovery')) {
+      setScreen('reset-password')
+      setLoading(false)
+      return
+    }
+  }, [])
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
@@ -67,15 +77,6 @@ export default function App() {
         const today = new Date().toISOString().split('T')[0]
         if (couple.last_match === today) setMatched(true)
 
-        // Count mutual yes matches
-        const { count } = await supabase
-          .from('daily_responses')
-          .select('date', { count: 'exact', head: false })
-          .eq('couple_id', data.couple_id)
-          .eq('response', 'yes')
-          .eq('user_id', userId)
-        
-        // Get partner yes count for same dates to find matches
         const { data: myYes } = await supabase
           .from('daily_responses')
           .select('date')
@@ -137,29 +138,18 @@ export default function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: user?.id, coupleId }),
     })
-    setPartnerName('')
-    setPartnerId('')
-    setCoupleId('')
-    setYesCount(0)
-    setMatched(false)
-    setTodayResponse(null)
+    setPartnerName(''); setPartnerId(''); setCoupleId('')
+    setYesCount(0); setMatched(false); setTodayResponse(null)
     setProfile(p => p ? { ...p, couple_id: null } : p)
     setScreen('couple-setup')
   }
-// Catch password reset redirect from Supabase email
-  useEffect(() => {
-    const hash = window.location.hash
-    if (hash.includes('type=recovery')) {
-      setScreen('reset-password')
-      setLoading(false)
-    }
-  }, [])
+
   if (loading) return <Splash />
+  if (screen === 'reset-password') return <ResetPassword onDone={() => { setScreen('login'); window.location.hash = '' }} />
   if (screen === 'landing') return <Landing onLogin={() => setScreen('login')} onSignup={() => setScreen('signup')} />
   if (screen === 'login') return <Login onBack={() => setScreen('landing')} onForgot={() => setScreen('forgot-password')} onSuccess={() => {}} />
   if (screen === 'signup') return <Signup onBack={() => setScreen('landing')} onSuccess={(u) => { setUser(u); enablePush(u.id) }} />
   if (screen === 'forgot-password') return <ForgotPassword onBack={() => setScreen('login')} />
-  if (screen === 'reset-password') return <ResetPassword onDone={() => setScreen('login')} />
   if (screen === 'couple-setup') return (
     <CoupleSetup
       userId={user?.id || ''}
@@ -363,6 +353,52 @@ function ForgotPassword({ onBack }: { onBack: () => void }) {
   )
 }
 
+// ── RESET PASSWORD ───────────────────────────────────────────────────
+function ResetPassword({ onDone }: { onDone: () => void }) {
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [done, setDone] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!password || !confirm) return setError('Fill both fields.')
+    if (password.length < 6) return setError('Password needs 6+ characters.')
+    if (password !== confirm) return setError("Passwords don't match.")
+    setLoading(true); setError('')
+    const { error: updateError } = await supabase.auth.updateUser({ password })
+    if (updateError) { setError(updateError.message); setLoading(false) }
+    else setDone(true)
+  }
+
+  return (
+    <AuthShell title="New password." onBack={onDone}>
+      {done ? (
+        <div className={styles.sentMsg}>
+          <div className={styles.sentIcon}>✓</div>
+          <p>Password updated. You're good to go.</p>
+          <button className="btn" onClick={onDone} style={{marginTop:'1rem'}}>Sign in →</button>
+        </div>
+      ) : (
+        <>
+          <div className={styles.formGroup}>
+            <label className="label">New password</label>
+            <input className="input" type="password" placeholder="6+ characters" value={password} onChange={e => setPassword(e.target.value)} />
+          </div>
+          <div className={styles.formGroup}>
+            <label className="label">Confirm password</label>
+            <input className="input" type="password" placeholder="Same again" value={confirm} onChange={e => setConfirm(e.target.value)} />
+          </div>
+          {error && <p className="error-msg">{error}</p>}
+          <button className="btn" onClick={handleSubmit} disabled={loading}>
+            {loading ? 'Updating...' : 'Set new password →'}
+          </button>
+        </>
+      )}
+    </AuthShell>
+  )
+}
+
 // ── COUPLE SETUP ─────────────────────────────────────────────────────
 function CoupleSetup({ userId, generatedCode, setGeneratedCode, inviteCode, setInviteCode, coupleStatus, setCoupleStatus, onLinked }: any) {
   const [tab, setTab] = useState<'send' | 'receive'>('send')
@@ -461,15 +497,12 @@ function Home({ profile, partnerName, todayResponse, matched, yesCount, onRespon
         <div className={styles.logo}>u<em>Down</em></div>
         <div className={styles.homeHeaderRight}>
           {yesCount > 0 && (
-            <div className={styles.yesCounter} title="Times you've both said yes">
-              ✦ {yesCount}
-            </div>
+            <div className={styles.yesCounter} title="Times you've both said yes">✦ {yesCount}</div>
           )}
           <button className={styles.settingsBtn} onClick={onSettings}>⚙</button>
           <button className={styles.signOut} onClick={onSignOut}>sign out</button>
         </div>
       </div>
-
       <div className={styles.homeBody}>
         <div className={styles.homeGlow} />
         {matched ? (
@@ -523,12 +556,10 @@ function Settings({ profile, partnerName, yesCount, onRemovePartner, onBack, onS
         <button className={styles.backBtn} onClick={onBack}>← back</button>
         <div className={styles.logo}>u<em>Down</em></div>
         <h2 className={`${styles.authTitle} serif`}>Account.</h2>
-
         <div className={styles.settingsCard}>
           <div className={styles.settingsLabel}>You</div>
           <div className={styles.settingsValue}>{profile?.name}</div>
         </div>
-
         {partnerName && (
           <div className={styles.settingsCard}>
             <div className={styles.settingsLabel}>Your partner</div>
@@ -539,7 +570,6 @@ function Settings({ profile, partnerName, yesCount, onRemovePartner, onBack, onS
             <button className={styles.dangerBtn} onClick={onRemovePartner}>Remove partner</button>
           </div>
         )}
-
         <div style={{marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '0.8rem'}}>
           <button className="btn btn-ghost" onClick={onSignOut}>Sign out</button>
         </div>
@@ -559,49 +589,5 @@ function AuthShell({ title, onBack, children }: { title: string; onBack: () => v
         <div className={styles.authForm}>{children}</div>
       </div>
     </div>
-  )
-// ── RESET PASSWORD ───────────────────────────────────────────────────
-function ResetPassword({ onDone }: { onDone: () => void }) {
-  const [password, setPassword] = useState('')
-  const [confirm, setConfirm] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [done, setDone] = useState(false)
-
-  const handleSubmit = async () => {
-    if (!password || !confirm) return setError('Fill both fields.')
-    if (password.length < 6) return setError('Password needs 6+ characters.')
-    if (password !== confirm) return setError("Passwords don't match.")
-    setLoading(true); setError('')
-    const { error: updateError } = await supabase.auth.updateUser({ password })
-    if (updateError) { setError(updateError.message); setLoading(false) }
-    else setDone(true)
-  }
-
-  return (
-    <AuthShell title="New password." onBack={onDone}>
-      {done ? (
-        <div className={styles.sentMsg}>
-          <div className={styles.sentIcon}>✓</div>
-          <p>Password updated. You're good to go.</p>
-          <button className="btn" onClick={onDone} style={{marginTop:'1rem'}}>Sign in →</button>
-        </div>
-      ) : (
-        <>
-          <div className={styles.formGroup}>
-            <label className="label">New password</label>
-            <input className="input" type="password" placeholder="6+ characters" value={password} onChange={e => setPassword(e.target.value)} />
-          </div>
-          <div className={styles.formGroup}>
-            <label className="label">Confirm password</label>
-            <input className="input" type="password" placeholder="Same again" value={confirm} onChange={e => setConfirm(e.target.value)} />
-          </div>
-          {error && <p className="error-msg">{error}</p>}
-          <button className="btn" onClick={handleSubmit} disabled={loading}>
-            {loading ? 'Updating...' : 'Set new password →'}
-          </button>
-        </>
-      )}
-    </AuthShell>
   )
 }

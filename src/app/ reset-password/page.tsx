@@ -12,6 +12,7 @@ export default function ResetPasswordPage() {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
+    // Supabase puts the tokens in the URL hash — extract and set session
     const hash = window.location.hash
     if (!hash) { setError('Invalid or expired reset link.'); return }
 
@@ -25,6 +26,7 @@ export default function ResetPasswordPage() {
       return
     }
 
+    // Set the session so updateUser works
     supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
       .then(({ error }) => {
         if (error) setError('Invalid or expired reset link.')
@@ -39,7 +41,7 @@ export default function ResetPasswordPage() {
     setLoading(true); setError('')
     const { error: updateError } = await supabase.auth.updateUser({ password })
     if (updateError) { setError(updateError.message); setLoading(false) }
-    else { window.location.href = '/' }
+    else { await supabase.auth.signOut(); setDone(true) }
   }
 
   return (
@@ -90,7 +92,7 @@ export default function ResetPasswordPage() {
                     style={{
                       background: 'rgba(245,240,232,0.05)', border: '1px solid rgba(232,165,152,0.2)',
                       color: '#F5F0E8', padding: '0.9rem 1.2rem', fontFamily: "'DM Mono', monospace",
-                      fontSize: '0.82rem', width: '100%', outline: 'none', boxSizing: 'border-box' as const
+                      fontSize: '0.82rem', width: '100%', outline: 'none', boxSizing: 'border-box'
                     }}
                   />
                 </div>
@@ -104,7 +106,7 @@ export default function ResetPasswordPage() {
                     style={{
                       background: 'rgba(245,240,232,0.05)', border: '1px solid rgba(232,165,152,0.2)',
                       color: '#F5F0E8', padding: '0.9rem 1.2rem', fontFamily: "'DM Mono', monospace",
-                      fontSize: '0.82rem', width: '100%', outline: 'none', boxSizing: 'border-box' as const
+                      fontSize: '0.82rem', width: '100%', outline: 'none', boxSizing: 'border-box'
                     }}
                   />
                 </div>
@@ -123,15 +125,8 @@ export default function ResetPasswordPage() {
             )}
 
             {!ready && !error && (
-             {!ready && !error && (
-  <p style={{ color: '#8A847C', fontSize: '0.8rem' }}>Verifying your link...</p>
-)}
-{error && (
-  <a href="/" style={{
-    display: 'block', marginTop: '1rem', color: '#8A847C',
-    fontSize: '0.75rem', textDecoration: 'underline', cursor: 'pointer'
-  }}>← Back to app</a>
-)}
+              <p style={{ color: '#8A847C', fontSize: '0.8rem' }}>Verifying your link...</p>
+            )}
           </>
         )}
       </div>

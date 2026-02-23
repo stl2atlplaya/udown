@@ -39,7 +39,7 @@ export default function ResetPasswordPage() {
     setLoading(true); setError('')
     const { error: updateError } = await supabase.auth.updateUser({ password })
     if (updateError) { setError(updateError.message); setLoading(false) }
-    else { await supabase.auth.signOut(); setDone(true) }
+    else { window.location.href = '/' }
   }
 
   return (

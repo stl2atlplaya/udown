@@ -123,8 +123,15 @@ export default function ResetPasswordPage() {
             )}
 
             {!ready && !error && (
-              <p style={{ color: '#8A847C', fontSize: '0.8rem' }}>Verifying your link...</p>
-            )}
+             {!ready && !error && (
+  <p style={{ color: '#8A847C', fontSize: '0.8rem' }}>Verifying your link...</p>
+)}
+{error && (
+  <a href="/" style={{
+    display: 'block', marginTop: '1rem', color: '#8A847C',
+    fontSize: '0.75rem', textDecoration: 'underline', cursor: 'pointer'
+  }}>← Back to app</a>
+)}
           </>
         )}
       </div>

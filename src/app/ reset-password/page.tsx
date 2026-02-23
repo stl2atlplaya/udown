@@ -72,6 +72,7 @@ export default function ResetPasswordPage() {
           </div>
         ) : (
           <>
+            <a href="/" style={{ display: 'block', marginBottom: '1.5rem', color: '#8A847C', fontSize: '0.75rem', textDecoration: 'underline' }}>← Back to app</a>
             <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: '2rem', fontStyle: 'italic', marginBottom: '2rem' }}>
               New password.
             </h2>

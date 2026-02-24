@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
   const obj = event.data.object as any
 
-  if (event.type === 'account.session.completed') {
+  if (event.type === 'checkout.session.completed') {
     const userId = obj.metadata?.userId
     if (userId) {
       const Stripe = (await import('stripe')).default

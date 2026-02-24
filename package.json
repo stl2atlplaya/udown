@@ -20,5 +20,6 @@
     "@types/react-dom": "^18",
     "@types/web-push": "^3.6.3",
     "typescript": "^5"
+    "stripe": "^14.0.0"
   }
 }

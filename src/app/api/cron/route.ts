@@ -25,13 +25,54 @@ const MESSAGES = [
 ]
 
 export async function GET(req: NextRequest) {
-  // Verify cron secret to prevent unauthorized calls
   const authHeader = req.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Get all users with push subscriptions
+  const nowUtc = new Date()
+  const todayEst = new Date(nowUtc.toLocaleString('en-US', { timeZone: 'America/New_York' }))
+  const todayKey = todayEst.toISOString().split('T')[0]
+
+  // Check if we already have a scheduled time for today
+  const { data: existing } = await supabase
+    .from('daily_schedule')
+    .select('send_at, sent')
+    .eq('date', todayKey)
+    .single()
+
+  let sendAt: Date
+
+  if (!existing) {
+    // Pick a random time between 4:00pm and 6:00pm EST today
+    const randomMinutes = Math.floor(Math.random() * 121) // 0-120 mins
+    const sendEst = new Date(todayEst)
+    sendEst.setHours(16, randomMinutes, 0, 0) // 4pm + random minutes
+
+    // Convert back to UTC for storage
+    sendAt = new Date(sendEst.toLocaleString('en-US', { timeZone: 'UTC' }))
+
+    await supabase.from('daily_schedule').insert({
+      date: todayKey,
+      send_at: sendAt.toISOString(),
+      sent: false,
+    })
+  } else if (existing.sent) {
+    // Already sent today
+    return NextResponse.json({ status: 'already_sent_today' })
+  } else {
+    sendAt = new Date(existing.send_at)
+  }
+
+  // Check if it's time to send yet
+  if (nowUtc < sendAt) {
+    const minutesUntil = Math.round((sendAt.getTime() - nowUtc.getTime()) / 60000)
+    return NextResponse.json({ status: 'not_yet', minutesUntil })
+  }
+
+  // Time to send! Mark as sent first to prevent duplicates
+  await supabase.from('daily_schedule').update({ sent: true }).eq('date', todayKey)
+
   const { data: subs, error } = await supabase
     .from('push_subscriptions')
     .select('user_id, subscription')
@@ -39,36 +80,24 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!subs || subs.length === 0) return NextResponse.json({ sent: 0 })
 
-  // Pick a random message for today
   const msg = MESSAGES[Math.floor(Math.random() * MESSAGES.length)]
-
-  const payload = JSON.stringify({
-    title: msg.title,
-    body: msg.body,
-    type: 'daily',
-  })
+  const payload = JSON.stringify({ title: msg.title, body: msg.body, type: 'daily' })
 
   let sent = 0
   const stale: string[] = []
 
-  const promises = subs.map(async ({ user_id, subscription }) => {
+  await Promise.allSettled(subs.map(async ({ user_id, subscription }) => {
     try {
       await webpush.sendNotification(JSON.parse(subscription), payload)
       sent++
     } catch (err: any) {
-      // 410 Gone = subscription expired/invalid, clean it up
-      if (err.statusCode === 410) {
-        stale.push(user_id)
-      }
+      if (err.statusCode === 410) stale.push(user_id)
     }
-  })
+  }))
 
-  await Promise.allSettled(promises)
-
-  // Remove stale subscriptions
   if (stale.length > 0) {
     await supabase.from('push_subscriptions').delete().in('user_id', stale)
   }
 
-  return NextResponse.json({ sent, stale: stale.length })
+  return NextResponse.json({ status: 'sent', sent, stale: stale.length })
 }

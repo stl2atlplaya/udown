@@ -15,6 +15,35 @@ interface Profile {
   couple_id: string | null
 }
 
+const POSITIONS = [
+  { name: "The Lotus", description: "Face to face, wrapped together. Slow and intimate." },
+  { name: "Missionary", description: "Classic for a reason. Eye contact, full connection." },
+  { name: "Cowgirl", description: "One partner takes the lead. All the control." },
+  { name: "Spooning", description: "Close, warm, unhurried. Perfect for tonight." },
+  { name: "The Bridge", description: "Arched and open. Surprisingly deep." },
+  { name: "Doggy Style", description: "Primal and passionate. No eye contact required." },
+  { name: "Reverse Cowgirl", description: "A different angle. A different experience." },
+  { name: "The Cat", description: "Like missionary, but shifted. Every movement counts." },
+  { name: "Standing", description: "Spontaneous. Against the wall. Why not." },
+  { name: "The Pretzel", description: "Intertwined and close. Takes a second to find the rhythm." },
+  { name: "Seated", description: "Face to face, lap to lap. Deeply intimate." },
+  { name: "The Waterfall", description: "Head rushes. Literally." },
+  { name: "Edge of Bed", description: "Simple setup. Surprisingly good angle." },
+  { name: "The Snake", description: "Lying flat, close as possible. Slow burn." },
+  { name: "The Sphinx", description: "Half raised, half surrendered. Intense." },
+  { name: "Legs Up", description: "Deep and deliberate. Communication helps." },
+  { name: "The Chairperson", description: "Seated power dynamic. Very good use of furniture." },
+  { name: "The Butter Churner", description: "Adventurous. Worth trying at least once." },
+  { name: "Side by Side", description: "Lazy and lovely. Sunday morning energy." },
+  { name: "The Yab-Yum", description: "Ancient tantric position. Breathing together matters." },
+]
+
+function getTodayPosition() {
+  const today = new Date().toISOString().split('T')[0]
+  const seed = today.split('-').reduce((a, b) => a + parseInt(b), 0)
+  return POSITIONS[seed % POSITIONS.length]
+}
+
 export default function App() {
   const [screen, setScreen] = useState<Screen>('landing')
   const [user, setUser] = useState<User | null>(null)
@@ -29,6 +58,8 @@ export default function App() {
   const [partnerId, setPartnerId] = useState('')
   const [coupleId, setCoupleId] = useState('')
   const [yesCount, setYesCount] = useState(0)
+  const [currentStreak, setCurrentStreak] = useState(0)
+  const [longestStreak, setLongestStreak] = useState(0)
   const isRecovery = useRef(false)
 
   useEffect(() => {
@@ -39,15 +70,12 @@ export default function App() {
         setLoading(false)
         return
       }
-      // Don't let any other event override the recovery screen
       if (isRecovery.current) return
-
       setUser(session?.user ?? null)
       if (session?.user) loadProfile(session.user.id)
       else { setLoading(false); setScreen('landing') }
     })
 
-    // Also check session on mount
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (isRecovery.current) return
       setUser(session?.user ?? null)
@@ -58,6 +86,42 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
+  const calculateStreaks = (myYesDates: string[], partnerYesDates: string[]) => {
+    const mySet = new Set(myYesDates)
+    const partnerSet = new Set(partnerYesDates)
+    const matchDates = myYesDates.filter(d => partnerSet.has(d)).sort()
+
+    if (matchDates.length === 0) return { current: 0, longest: 0 }
+
+    let longest = 1
+    let current = 1
+    let tempStreak = 1
+
+    for (let i = 1; i < matchDates.length; i++) {
+      const prev = new Date(matchDates[i - 1])
+      const curr = new Date(matchDates[i])
+      const diff = (curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24)
+      if (diff === 1) {
+        tempStreak++
+        if (tempStreak > longest) longest = tempStreak
+      } else {
+        tempStreak = 1
+      }
+    }
+
+    // Check if streak is current (includes today or yesterday)
+    const today = new Date().toISOString().split('T')[0]
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+    const lastMatch = matchDates[matchDates.length - 1]
+
+    let currentStreak = 0
+    if (lastMatch === today || lastMatch === yesterday) {
+      currentStreak = tempStreak
+    }
+
+    return { current: currentStreak, longest: Math.max(longest, tempStreak) }
+  }
+
   const loadProfile = useCallback(async (userId: string) => {
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
     setProfile(data)
@@ -65,10 +129,8 @@ export default function App() {
     if (data?.couple_id) {
       setCoupleId(data.couple_id)
       const { data: couple } = await supabase
-        .from('couples')
-        .select('user1_id, user2_id, last_match')
-        .eq('id', data.couple_id)
-        .single()
+        .from('couples').select('user1_id, user2_id, last_match')
+        .eq('id', data.couple_id).single()
 
       if (couple) {
         const pid = couple.user1_id === userId ? couple.user2_id : couple.user1_id
@@ -92,6 +154,13 @@ export default function App() {
           const myDates = new Set(myYes.map((r: any) => r.date))
           const matches = partnerYes.filter((r: any) => myDates.has(r.date))
           setYesCount(matches.length)
+
+          const streaks = calculateStreaks(
+            myYes.map((r: any) => r.date),
+            partnerYes.map((r: any) => r.date)
+          )
+          setCurrentStreak(streaks.current)
+          setLongestStreak(streaks.longest)
         }
       }
 
@@ -137,6 +206,7 @@ export default function App() {
     })
     setPartnerName(''); setPartnerId(''); setCoupleId('')
     setYesCount(0); setMatched(false); setTodayResponse(null)
+    setCurrentStreak(0); setLongestStreak(0)
     setProfile(p => p ? { ...p, couple_id: null } : p)
     setScreen('couple-setup')
   }
@@ -169,6 +239,8 @@ export default function App() {
       profile={profile}
       partnerName={partnerName}
       yesCount={yesCount}
+      currentStreak={currentStreak}
+      longestStreak={longestStreak}
       onRemovePartner={handleRemovePartner}
       onBack={() => setScreen('home')}
       onSignOut={async () => {
@@ -184,6 +256,8 @@ export default function App() {
       todayResponse={todayResponse}
       matched={matched}
       yesCount={yesCount}
+      currentStreak={currentStreak}
+      longestStreak={longestStreak}
       onRespond={async (r) => {
         const res = await fetch('/api/respond', {
           method: 'POST',
@@ -333,9 +407,7 @@ function ForgotPassword({ onBack }: { onBack: () => void }) {
         </div>
       ) : (
         <>
-          <p className={styles.hint} style={{marginBottom:'1rem'}}>
-            Enter your email and we'll send a reset link.
-          </p>
+          <p className={styles.hint} style={{marginBottom:'1rem'}}>Enter your email and we'll send a reset link.</p>
           <div className={styles.formGroup}>
             <label className="label">Email</label>
             <input className="input" type="email" placeholder="you@somewhere.com" value={email} onChange={e => setEmail(e.target.value)} />
@@ -472,18 +544,21 @@ function CoupleSetup({ userId, generatedCode, setGeneratedCode, inviteCode, setI
   )
 }
 
-function Home({ profile, partnerName, todayResponse, matched, yesCount, onRespond, onSettings, onSignOut }: {
+function Home({ profile, partnerName, todayResponse, matched, yesCount, currentStreak, longestStreak, onRespond, onSettings, onSignOut }: {
   profile: Profile | null; partnerName: string; todayResponse: 'yes' | 'no' | null
-  matched: boolean; yesCount: number
+  matched: boolean; yesCount: number; currentStreak: number; longestStreak: number
   onRespond: (r: 'yes' | 'no') => Promise<void>; onSettings: () => void; onSignOut: () => void
 }) {
   const [loading, setLoading] = useState(false)
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Hey' : 'Good evening'
+  const position = getTodayPosition()
 
   const respond = async (r: 'yes' | 'no') => {
     setLoading(true); await onRespond(r); setLoading(false)
   }
+
+  const showDashboard = todayResponse !== null || matched
 
   return (
     <div className={styles.screen}>
@@ -497,15 +572,33 @@ function Home({ profile, partnerName, todayResponse, matched, yesCount, onRespon
           <button className={styles.signOut} onClick={onSignOut}>sign out</button>
         </div>
       </div>
+
       <div className={styles.homeBody}>
         <div className={styles.homeGlow} />
+
         {matched ? (
           <div className={styles.matchState}>
             <div className={styles.matchIcon}>✦</div>
             <h2 className={`${styles.matchTitle} serif`}>You're both down.</h2>
             <p className={styles.matchSub}>Tonight's the night. We'll see ourselves out.</p>
-            <p className={styles.matchSmall}>See you tomorrow, {profile?.name}.</p>
             {yesCount > 0 && <div className={styles.matchCount}>✦ {yesCount} {yesCount === 1 ? 'time' : 'times'} and counting</div>}
+            <div className={styles.dashboard}>
+              <div className={styles.dashboardGrid}>
+                <div className={styles.dashStat}>
+                  <div className={styles.dashStatValue}>{currentStreak}</div>
+                  <div className={styles.dashStatLabel}>Current Streak</div>
+                </div>
+                <div className={styles.dashStat}>
+                  <div className={styles.dashStatValue}>{longestStreak}</div>
+                  <div className={styles.dashStatLabel}>Longest Streak</div>
+                </div>
+              </div>
+              <div className={styles.positionCard}>
+                <div className={styles.positionLabel}>Tonight's suggestion</div>
+                <div className={styles.positionName}>{position.name}</div>
+                <div className={styles.positionDesc}>{position.description}</div>
+              </div>
+            </div>
           </div>
         ) : todayResponse ? (
           <div className={styles.respondedState}>
@@ -520,6 +613,23 @@ function Home({ profile, partnerName, todayResponse, matched, yesCount, onRespon
               You said <span className={todayResponse === 'yes' ? styles.tagYes : styles.tagNo}>
                 {todayResponse === 'yes' ? 'yes' : 'no'}
               </span> today
+            </div>
+            <div className={styles.dashboard}>
+              <div className={styles.dashboardGrid}>
+                <div className={styles.dashStat}>
+                  <div className={styles.dashStatValue}>{currentStreak}</div>
+                  <div className={styles.dashStatLabel}>Current Streak</div>
+                </div>
+                <div className={styles.dashStat}>
+                  <div className={styles.dashStatValue}>{longestStreak}</div>
+                  <div className={styles.dashStatLabel}>Longest Streak</div>
+                </div>
+              </div>
+              <div className={styles.positionCard}>
+                <div className={styles.positionLabel}>Position of the day</div>
+                <div className={styles.positionName}>{position.name}</div>
+                <div className={styles.positionDesc}>{position.description}</div>
+              </div>
             </div>
           </div>
         ) : (
@@ -539,8 +649,9 @@ function Home({ profile, partnerName, todayResponse, matched, yesCount, onRespon
   )
 }
 
-function Settings({ profile, partnerName, yesCount, onRemovePartner, onBack, onSignOut }: {
+function Settings({ profile, partnerName, yesCount, currentStreak, longestStreak, onRemovePartner, onBack, onSignOut }: {
   profile: Profile | null; partnerName: string; yesCount: number
+  currentStreak: number; longestStreak: number
   onRemovePartner: () => void; onBack: () => void; onSignOut: () => void
 }) {
   return (
@@ -559,6 +670,16 @@ function Settings({ profile, partnerName, yesCount, onRemovePartner, onBack, onS
             <div className={styles.settingsValue}>{partnerName}</div>
             <div className={styles.settingsSub}>
               Together you've both said yes <strong style={{color:'var(--blush)'}}>{yesCount} {yesCount === 1 ? 'time' : 'times'}</strong>. Not bad.
+            </div>
+            <div className={styles.settingsStreaks}>
+              <div className={styles.dashStat}>
+                <div className={styles.dashStatValue}>{currentStreak}</div>
+                <div className={styles.dashStatLabel}>Current Streak</div>
+              </div>
+              <div className={styles.dashStat}>
+                <div className={styles.dashStatValue}>{longestStreak}</div>
+                <div className={styles.dashStatLabel}>Longest Streak</div>
+              </div>
             </div>
             <button className={styles.dangerBtn} onClick={onRemovePartner}>Remove partner</button>
           </div>

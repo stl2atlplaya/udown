@@ -511,3 +511,78 @@
   transition: all 0.2s;
 }
 .dangerBtn:hover { background: rgba(232,138,138,0.08); border-color: rgba(232,138,138,0.5); }
+
+/* DASHBOARD */
+.dashboard {
+  margin-top: 2rem;
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.dashboardGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.dashStat {
+  border: 1px solid rgba(232,165,152,0.12);
+  padding: 1.2rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.dashStatValue {
+  font-family: 'DM Serif Display', serif;
+  font-size: 2.2rem;
+  font-style: italic;
+  color: var(--cream);
+  line-height: 1;
+}
+
+.dashStatLabel {
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--warm-gray);
+}
+
+.positionCard {
+  border: 1px solid rgba(232,165,152,0.12);
+  padding: 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.positionLabel {
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--warm-gray);
+}
+
+.positionName {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.4rem;
+  font-style: italic;
+  color: var(--blush);
+}
+
+.positionDesc {
+  font-size: 0.78rem;
+  line-height: 1.7;
+  color: var(--warm-gray);
+}
+
+.settingsStreaks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem;
+  margin: 0.8rem 0;
+}

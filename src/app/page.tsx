@@ -582,21 +582,21 @@ function Home({ profile, partnerName, todayResponse, matched, yesCount, currentS
             <h2 className={`${styles.matchTitle} serif`}>You're both down.</h2>
             <p className={styles.matchSub}>Tonight's the night. We'll see ourselves out.</p>
             {yesCount > 0 && <div className={styles.matchCount}>✦ {yesCount} {yesCount === 1 ? 'time' : 'times'} and counting</div>}
-            <div className={styles.dashboard}>
-              <div className={styles.dashboardGrid}>
-                <div className={styles.dashStat}>
-                  <div className={styles.dashStatValue}>{currentStreak}</div>
-                  <div className={styles.dashStatLabel}>Current Streak</div>
+            <div style={{marginTop:'2rem',width:'100%',maxWidth:'340px',display:'flex',flexDirection:'column',gap:'1rem'}}>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem'}}>
+                <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1.2rem',textAlign:'center'}}>
+                  <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'2.2rem',fontStyle:'italic',color:'#F5F0E8',lineHeight:1}}>{currentStreak}</div>
+                  <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginTop:'0.3rem'}}>Current Streak</div>
                 </div>
-                <div className={styles.dashStat}>
-                  <div className={styles.dashStatValue}>{longestStreak}</div>
-                  <div className={styles.dashStatLabel}>Longest Streak</div>
+                <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1.2rem',textAlign:'center'}}>
+                  <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'2.2rem',fontStyle:'italic',color:'#F5F0E8',lineHeight:1}}>{longestStreak}</div>
+                  <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginTop:'0.3rem'}}>Longest Streak</div>
                 </div>
               </div>
-              <div className={styles.positionCard}>
-                <div className={styles.positionLabel}>Tonight's suggestion</div>
-                <div className={styles.positionName}>{position.name}</div>
-                <div className={styles.positionDesc}>{position.description}</div>
+              <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1.4rem',display:'flex',flexDirection:'column',gap:'0.4rem'}}>
+                <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C'}}>Tonight's suggestion</div>
+                <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'1.4rem',fontStyle:'italic',color:'#E8A598'}}>{position.name}</div>
+                <div style={{fontSize:'0.78rem',lineHeight:1.7,color:'#8A847C'}}>{position.description}</div>
               </div>
             </div>
           </div>
@@ -614,21 +614,21 @@ function Home({ profile, partnerName, todayResponse, matched, yesCount, currentS
                 {todayResponse === 'yes' ? 'yes' : 'no'}
               </span> today
             </div>
-            <div className={styles.dashboard}>
-              <div className={styles.dashboardGrid}>
-                <div className={styles.dashStat}>
-                  <div className={styles.dashStatValue}>{currentStreak}</div>
-                  <div className={styles.dashStatLabel}>Current Streak</div>
+            <div style={{marginTop:'2rem',width:'100%',maxWidth:'340px',display:'flex',flexDirection:'column',gap:'1rem'}}>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem'}}>
+                <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1.2rem',textAlign:'center'}}>
+                  <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'2.2rem',fontStyle:'italic',color:'#F5F0E8',lineHeight:1}}>{currentStreak}</div>
+                  <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginTop:'0.3rem'}}>Current Streak</div>
                 </div>
-                <div className={styles.dashStat}>
-                  <div className={styles.dashStatValue}>{longestStreak}</div>
-                  <div className={styles.dashStatLabel}>Longest Streak</div>
+                <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1.2rem',textAlign:'center'}}>
+                  <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'2.2rem',fontStyle:'italic',color:'#F5F0E8',lineHeight:1}}>{longestStreak}</div>
+                  <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginTop:'0.3rem'}}>Longest Streak</div>
                 </div>
               </div>
-              <div className={styles.positionCard}>
-                <div className={styles.positionLabel}>Position of the day</div>
-                <div className={styles.positionName}>{position.name}</div>
-                <div className={styles.positionDesc}>{position.description}</div>
+              <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1.4rem',display:'flex',flexDirection:'column',gap:'0.4rem'}}>
+                <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C'}}>Position of the day</div>
+                <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'1.4rem',fontStyle:'italic',color:'#E8A598'}}>{position.name}</div>
+                <div style={{fontSize:'0.78rem',lineHeight:1.7,color:'#8A847C'}}>{position.description}</div>
               </div>
             </div>
           </div>
@@ -704,4 +704,3 @@ function AuthShell({ title, onBack, children }: { title: string; onBack: () => v
     </div>
   )
 }
-

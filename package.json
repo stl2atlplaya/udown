@@ -12,16 +12,14 @@
     "react": "^18",
     "react-dom": "^18",
     "@supabase/supabase-js": "^2.44.4",
-    "web-push": "^3.6.7"
-     "stripe": "^14.0.0"
+    "web-push": "^3.6.7",
+    "stripe": "^14.0.0"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@types/web-push": "^3.6.3",
-    "@types/stripe": "^8.0.0",
     "typescript": "^5"
-  
   }
 }

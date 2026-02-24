@@ -595,7 +595,7 @@ function Home({ profile, partnerName, todayResponse, matched, yesCount, currentS
               </div>
               <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1.4rem',display:'flex',flexDirection:'column',gap:'0.6rem'}}>
                 <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C'}}>Tonight's suggestion</div>
-                <div style={{width:'100%',height:'80px',opacity:0.85}}>{position.svg}</div>
+               <div style={{width:'100%',height:'110px',opacity:0.85,marginBottom:'0.4rem'}}>{position.svg}</div>
                 <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'1.4rem',fontStyle:'italic',color:'#E8A598'}}>{position.name}</div>
                 <div style={{fontSize:'0.78rem',lineHeight:1.7,color:'#8A847C'}}>{position.description}</div>
               </div>

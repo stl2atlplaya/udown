@@ -428,6 +428,7 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
   const [showNoteInput, setShowNoteInput] = useState(false)
   const [note, setNote] = useState('')
   const [noteSaved, setNoteSaved] = useState(false)
+  const [notifStatus, setNotifStatus] = useState<'unknown'|'granted'|'denied'|'dismissed'>('unknown')
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Hey' : 'Good evening'
   const position = getTodayPosition()
@@ -438,6 +439,26 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
     setLoading(true)
     await onRespond(r, selectedMood)
     setLoading(false)
+  }
+
+  useEffect(() => {
+    if (!('Notification' in window)) { setNotifStatus('denied'); return }
+    if (Notification.permission === 'granted') setNotifStatus('granted')
+    else if (Notification.permission === 'denied') setNotifStatus('denied')
+    else setNotifStatus('unknown')
+  }, [])
+
+  const requestNotifPermission = async () => {
+    const permission = await Notification.requestPermission()
+    setNotifStatus(permission === 'granted' ? 'granted' : 'denied')
+    if (permission === 'granted') {
+      // Re-register push subscription
+      try {
+        const { registerPush } = await import('@/lib/push')
+        const sub = await registerPush()
+        if (sub) await fetch('/api/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription: sub, userId }) })
+      } catch (e) { console.error(e) }
+    }
   }
 
   const matchedMoodLabel = MOODS.find(m => m.key === partnerMood)?.label
@@ -459,6 +480,22 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
 
       <div className={styles.homeBody}>
         <div className={styles.homeGlow} />
+
+        {notifStatus === 'unknown' && (
+          <div style={{width:'100%',maxWidth:'340px',margin:'0 auto 1.5rem',border:'1px solid rgba(232,165,152,0.25)',padding:'1rem 1.2rem',display:'flex',flexDirection:'column' as const,gap:'0.6rem',background:'rgba(232,165,152,0.04)'}}>
+            <div style={{fontSize:'0.7rem',color:'#F5F0E8',lineHeight:1.5}}>🔔 Enable notifications to get your daily prompt and match alerts.</div>
+            <div style={{display:'flex',gap:'0.6rem'}}>
+              <button onClick={requestNotifPermission} className="btn btn-yes" style={{flex:1,padding:'0.5rem',fontSize:'0.72rem'}}>Enable</button>
+              <button onClick={() => setNotifStatus('dismissed')} className="btn btn-ghost" style={{flex:1,padding:'0.5rem',fontSize:'0.72rem'}}>Not now</button>
+            </div>
+          </div>
+        )}
+
+        {notifStatus === 'denied' && (
+          <div style={{width:'100%',maxWidth:'340px',margin:'0 auto 1.5rem',border:'1px solid rgba(138,132,124,0.2)',padding:'0.8rem 1.2rem',fontSize:'0.68rem',color:'#8A847C',lineHeight:1.6}}>
+            🔕 Notifications are blocked. Enable them in your browser settings to get daily prompts.
+          </div>
+        )}
 
         {matched ? (
           <div className={styles.matchState}>

@@ -103,3 +103,9 @@ input, button { font-family: 'DM Mono', monospace; }
 }
 
 .serif { font-family: 'DM Serif Display', serif; }
+
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.15); }
+}

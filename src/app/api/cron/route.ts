@@ -24,6 +24,25 @@ const MESSAGES = [
   { title: "Genuine question.", body: "Is tonight a good night? We're asking. u down? 🌙" },
 ]
 
+const REMINDER_MESSAGES = [
+  { title: "Still here.", body: "An hour ago you weren't sure. Are you sure now? 👀" },
+  { title: "Checking back in.", body: "No rush. But also… the night isn't getting younger. u down?" },
+  { title: "Your reminder.", body: "You asked us to ask again. So. u down tonight? 🌙" },
+  { title: "One more time.", body: "You hit snooze on this. We respect it. But now we're back. u down? 👀" },
+  { title: "Still wondering.", body: "An hour later and we're still curious. What do you say? 🌙" },
+  { title: "The nudge you asked for.", body: "This is that nudge. Don't waste it. u down?" },
+]
+
+async function sendToUser(subscription: string, payload: string): Promise<'sent' | 'stale'> {
+  try {
+    await webpush.sendNotification(JSON.parse(subscription), payload)
+    return 'sent'
+  } catch (err: any) {
+    if (err.statusCode === 410) return 'stale'
+    return 'stale'
+  }
+}
+
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -34,7 +53,35 @@ export async function GET(req: NextRequest) {
   const todayEst = new Date(nowUtc.toLocaleString('en-US', { timeZone: 'America/New_York' }))
   const todayKey = todayEst.toISOString().split('T')[0]
 
-  // Check if we already have a scheduled time for today
+  // --- Handle pending reminders ---
+  const { data: remindSubs } = await supabase
+    .from('push_subscriptions')
+    .select('user_id, subscription, remind_at')
+    .not('remind_at', 'is', null)
+    .lte('remind_at', nowUtc.toISOString())
+
+  if (remindSubs && remindSubs.length > 0) {
+    const remMsg = REMINDER_MESSAGES[Math.floor(Math.random() * REMINDER_MESSAGES.length)]
+    const remPayload = JSON.stringify({ title: remMsg.title, body: remMsg.body, type: 'daily' })
+    const staleUsers: string[] = []
+
+    await Promise.allSettled(remindSubs.map(async ({ user_id, subscription }) => {
+      const result = await sendToUser(subscription, remPayload)
+      if (result === 'stale') staleUsers.push(user_id)
+    }))
+
+    // Clear remind_at for all processed users
+    await supabase
+      .from('push_subscriptions')
+      .update({ remind_at: null })
+      .in('user_id', remindSubs.map(s => s.user_id))
+
+    if (staleUsers.length > 0) {
+      await supabase.from('push_subscriptions').delete().in('user_id', staleUsers)
+    }
+  }
+
+  // --- Handle daily notification ---
   const { data: existing } = await supabase
     .from('daily_schedule')
     .select('send_at, sent')
@@ -44,33 +91,26 @@ export async function GET(req: NextRequest) {
   let sendAt: Date
 
   if (!existing) {
-    // Pick a random time between 4:00pm and 6:00pm EST today
-    const randomMinutes = Math.floor(Math.random() * 121) // 0-120 mins
+    const randomMinutes = Math.floor(Math.random() * 121)
     const sendEst = new Date(todayEst)
-    sendEst.setHours(16, randomMinutes, 0, 0) // 4pm + random minutes
-
-    // Convert back to UTC for storage
+    sendEst.setHours(16, randomMinutes, 0, 0)
     sendAt = new Date(sendEst.toLocaleString('en-US', { timeZone: 'UTC' }))
-
     await supabase.from('daily_schedule').insert({
       date: todayKey,
       send_at: sendAt.toISOString(),
       sent: false,
     })
   } else if (existing.sent) {
-    // Already sent today
-    return NextResponse.json({ status: 'already_sent_today' })
+    return NextResponse.json({ status: 'already_sent_today', reminders: remindSubs?.length ?? 0 })
   } else {
     sendAt = new Date(existing.send_at)
   }
 
-  // Check if it's time to send yet
   if (nowUtc < sendAt) {
     const minutesUntil = Math.round((sendAt.getTime() - nowUtc.getTime()) / 60000)
     return NextResponse.json({ status: 'not_yet', minutesUntil })
   }
 
-  // Time to send! Mark as sent first to prevent duplicates
   await supabase.from('daily_schedule').update({ sent: true }).eq('date', todayKey)
 
   const { data: subs, error } = await supabase
@@ -87,12 +127,9 @@ export async function GET(req: NextRequest) {
   const stale: string[] = []
 
   await Promise.allSettled(subs.map(async ({ user_id, subscription }) => {
-    try {
-      await webpush.sendNotification(JSON.parse(subscription), payload)
-      sent++
-    } catch (err: any) {
-      if (err.statusCode === 410) stale.push(user_id)
-    }
+    const result = await sendToUser(subscription, payload)
+    if (result === 'sent') sent++
+    else stale.push(user_id)
   }))
 
   if (stale.length > 0) {

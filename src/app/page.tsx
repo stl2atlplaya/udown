@@ -429,6 +429,9 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
   const [note, setNote] = useState('')
   const [noteSaved, setNoteSaved] = useState(false)
   const [notifStatus, setNotifStatus] = useState<'unknown'|'granted'|'denied'|'dismissed'>('unknown')
+  const [signalSent, setSignalSent] = useState<'none'|'onmyway'|'time'>('none')
+  const [suggestedTime, setSuggestedTime] = useState('')
+  const [showTimePicker, setShowTimePicker] = useState(false)
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Hey' : 'Good evening'
   const position = getTodayPosition()
@@ -461,10 +464,16 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
     }
   }
 
+  const sendSignal = async (type: 'on_my_way' | 'time', time?: string) => {
+    await fetch('/api/signal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, type, time }) })
+    setSignalSent(type === 'on_my_way' ? 'onmyway' : 'time')
+    setShowTimePicker(false)
+  }
+
   const matchedMoodLabel = MOODS.find(m => m.key === partnerMood)?.label
   const myMoodLabel = MOODS.find(m => m.key === todayMood)?.label
 
-  const milestoneMsg = yesCount === 10 ? "✦ 10 matches together." : yesCount === 25 ? "✦ 25 matches. Remarkable." : yesCount === 50 ? "✦ 50 matches. Legendary." : null
+  const milestoneMsg = yesCount === 10 ? "✦ Ten nights together." : yesCount === 25 ? "✦ Twenty-five. That's something." : yesCount === 50 ? "✦ Fifty nights. Remarkable." : yesCount === 100 ? "✦ One hundred. Legendary." : null
 
   return (
     <div className={styles.screen}>
@@ -499,32 +508,81 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
 
         {matched ? (
           <div className={styles.matchState}>
-            <div className={styles.matchIcon}>✦</div>
-            <h2 className={`${styles.matchTitle} serif`}>You're both down.</h2>
-            {milestoneMsg && <div style={{color:'#E8A598',fontSize:'0.75rem',letterSpacing:'0.1em',marginBottom:'0.5rem'}}>{milestoneMsg}</div>}
-            {matchedMoodLabel && myMoodLabel && <p style={{fontSize:'0.78rem',color:'#8A847C',marginBottom:'0.5rem'}}>You: {myMoodLabel} · Them: {matchedMoodLabel}</p>}
-            <p className={styles.matchSub}>Tonight's the night.</p>
-            {yesCount > 0 && <div className={styles.matchCount}>✦ {yesCount} {yesCount === 1 ? 'time' : 'times'} and counting</div>}
 
-            {isPremium && (
-              <div style={{marginTop:'1rem',width:'100%',maxWidth:'340px'}}>
-                {!noteSaved ? (
-                  showNoteInput ? (
-                    <div style={{marginBottom:'1rem'}}>
-                      <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Leave a note for tonight..." style={{width:'100%',background:'rgba(245,240,232,0.05)',border:'1px solid rgba(232,165,152,0.2)',color:'#F5F0E8',padding:'0.8rem',fontSize:'0.78rem',fontFamily:'monospace',resize:'none',height:'80px',boxSizing:'border-box' as const}} />
-                      <div style={{display:'flex',gap:'0.5rem',marginTop:'0.5rem'}}>
-                        <button className="btn" style={{flex:1,padding:'0.6rem'}} onClick={async () => { await onSaveNote(note); setNoteSaved(true) }}>Save note</button>
-                        <button className="btn btn-ghost" style={{flex:1,padding:'0.6rem'}} onClick={() => setShowNoteInput(false)}>Cancel</button>
+            {/* Animated match moment */}
+            <div style={{textAlign:'center' as const, marginBottom:'1.5rem'}}>
+              <div style={{fontSize:'2.5rem',animation:'pulse 2s ease-in-out infinite',marginBottom:'0.8rem'}}>✦</div>
+              <h2 className={`${styles.matchTitle} serif`} style={{marginBottom:'0.4rem'}}>You're both down.</h2>
+              <p style={{fontSize:'0.8rem',color:'#8A847C',lineHeight:1.7}}>
+                {matchedMoodLabel && myMoodLabel
+                  ? `You're feeling ${myMoodLabel.split(' ').slice(1).join(' ').toLowerCase()}. They're feeling ${matchedMoodLabel.split(' ').slice(1).join(' ').toLowerCase()}.`
+                  : "Tonight's the night."}
+              </p>
+            </div>
+
+            {/* Match counter + milestone */}
+            <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1.2rem 1.8rem',textAlign:'center' as const,marginBottom:'1.5rem',width:'100%',maxWidth:'340px',boxSizing:'border-box' as const}}>
+              <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'3rem',fontStyle:'italic',color:'#E8A598',lineHeight:1}}>{yesCount}</div>
+              <div style={{fontSize:'0.6rem',letterSpacing:'0.15em',textTransform:'uppercase' as const,color:'#8A847C',marginTop:'0.4rem'}}>nights together</div>
+              {milestoneMsg && (
+                <div style={{marginTop:'0.8rem',paddingTop:'0.8rem',borderTop:'1px solid rgba(232,165,152,0.15)',fontSize:'0.72rem',color:'#E8A598',letterSpacing:'0.05em'}}>{milestoneMsg}</div>
+              )}
+            </div>
+
+            {/* Signal section */}
+            <div style={{width:'100%',maxWidth:'340px',marginBottom:'1.5rem'}}>
+              <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginBottom:'0.8rem',textAlign:'center' as const}}>Let them know</div>
+
+              {signalSent === 'none' ? (
+                <div style={{display:'flex',flexDirection:'column' as const,gap:'0.6rem'}}>
+                  <button className="btn btn-yes" onClick={() => sendSignal('on_my_way')}
+                    style={{width:'100%',padding:'0.9rem',fontSize:'0.82rem',letterSpacing:'0.05em'}}>
+                    🌙 On my way now
+                  </button>
+
+                  {!showTimePicker ? (
+                    <button className="btn btn-ghost" onClick={() => setShowTimePicker(true)}
+                      style={{width:'100%',padding:'0.9rem',fontSize:'0.82rem'}}>
+                      ⏰ Suggest a time
+                    </button>
+                  ) : (
+                    <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1rem',display:'flex',flexDirection:'column' as const,gap:'0.6rem'}}>
+                      <div style={{fontSize:'0.68rem',color:'#8A847C'}}>What time works for you?</div>
+                      <input
+                        type="time"
+                        value={suggestedTime}
+                        onChange={e => setSuggestedTime(e.target.value)}
+                        style={{background:'rgba(245,240,232,0.05)',border:'1px solid rgba(232,165,152,0.2)',color:'#F5F0E8',padding:'0.6rem',fontSize:'1rem',textAlign:'center' as const,width:'100%',boxSizing:'border-box' as const}}
+                      />
+                      <div style={{display:'flex',gap:'0.5rem'}}>
+                        <button className="btn btn-yes" style={{flex:1,padding:'0.6rem',fontSize:'0.75rem'}}
+                          onClick={() => suggestedTime && sendSignal('time', suggestedTime)}
+                          disabled={!suggestedTime}>
+                          Send ✦
+                        </button>
+                        <button className="btn btn-ghost" style={{flex:1,padding:'0.6rem',fontSize:'0.75rem'}}
+                          onClick={() => setShowTimePicker(false)}>
+                          Cancel
+                        </button>
                       </div>
                     </div>
-                  ) : (
-                    <button className="btn btn-ghost" style={{width:'100%',marginBottom:'1rem',padding:'0.6rem',fontSize:'0.72rem'}} onClick={() => setShowNoteInput(true)}>📝 Leave a note for tonight</button>
-                  )
-                ) : <p style={{fontSize:'0.72rem',color:'#8A847C',marginBottom:'1rem',textAlign:'center'}}>Note saved ✓</p>}
-              </div>
-            )}
+                  )}
+                </div>
+              ) : (
+                <div style={{textAlign:'center' as const,padding:'1rem',border:'1px solid rgba(232,165,152,0.15)'}}>
+                  <div style={{fontSize:'1.2rem',marginBottom:'0.4rem'}}>{signalSent === 'onmyway' ? '🌙' : '⏰'}</div>
+                  <div style={{fontSize:'0.78rem',color:'#F5F0E8'}}>
+                    {signalSent === 'onmyway' ? 'They know you're on your way.' : `They know to expect you at ${suggestedTime}.`}
+                  </div>
+                </div>
+              )}
+            </div>
 
-            <Dashboard currentStreak={currentStreak} longestStreak={longestStreak} />
+            {/* Match counter in header already shown, just streaks here */}
+            <div style={{width:'100%',maxWidth:'340px',fontSize:'0.65rem',color:'#8A847C',textAlign:'center' as const,lineHeight:1.8}}>
+              {currentStreak > 1 && <div>🔥 {currentStreak} nights in a row</div>}
+            </div>
+
           </div>
 
         ) : todayResponse ? (
@@ -538,7 +596,7 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
               <MatchCalendar history={premiumData.history} />
             )}
 
-            <Dashboard currentStreak={currentStreak} longestStreak={longestStreak} />
+            <Dashboard yesCount={yesCount} currentStreak={currentStreak} />
 
             {isPremium && premiumData?.notes?.length > 0 && (
               <div style={{marginTop:'1rem',width:'100%',maxWidth:'340px'}}>
@@ -594,16 +652,16 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
   )
 }
 
-function Dashboard({ currentStreak, longestStreak }: any) {
+function Dashboard({ yesCount, currentStreak }: any) {
   return (
     <div style={{marginTop:'2rem',width:'100%',maxWidth:'340px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem'}}>
-      <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1.2rem',textAlign:'center'}}>
-        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'2.2rem',fontStyle:'italic',color:'#F5F0E8',lineHeight:1}}>{currentStreak}</div>
-        <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginTop:'0.3rem'}}>Current Streak</div>
+      <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1.2rem',textAlign:'center' as const}}>
+        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'2.2rem',fontStyle:'italic',color:'#E8A598',lineHeight:1}}>{yesCount}</div>
+        <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginTop:'0.3rem'}}>Nights Together</div>
       </div>
-      <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1.2rem',textAlign:'center'}}>
-        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'2.2rem',fontStyle:'italic',color:'#F5F0E8',lineHeight:1}}>{longestStreak}</div>
-        <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginTop:'0.3rem'}}>Longest Streak</div>
+      <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1.2rem',textAlign:'center' as const}}>
+        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'2.2rem',fontStyle:'italic',color:'#F5F0E8',lineHeight:1}}>{currentStreak > 0 ? `${currentStreak}🔥` : '—'}</div>
+        <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginTop:'0.3rem'}}>In a Row</div>
       </div>
     </div>
   )

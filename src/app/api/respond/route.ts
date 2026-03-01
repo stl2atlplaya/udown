@@ -57,8 +57,15 @@ export async function POST(req: NextRequest) {
     .eq('user_id', partnerId).eq('date', today).single()
 
   if (response === 'yes' && partnerResponse?.response === 'yes') {
-    await sendMatchNotification(userId, partnerId)
-    await supabase.from('couples').update({ last_match: today }).eq('id', profile.couple_id)
+    // Check not already notified today
+    const { data: alreadyMatched } = await supabase
+      .from('couples').select('last_match').eq('id', profile.couple_id).single()
+
+    if (alreadyMatched?.last_match !== today) {
+      await supabase.from('couples').update({ last_match: today }).eq('id', profile.couple_id)
+      await sendMatchNotification(userId, partnerId)
+    }
+
     return NextResponse.json({ success: true, matched: true })
   }
 
@@ -67,21 +74,30 @@ export async function POST(req: NextRequest) {
 
 async function sendMatchNotification(user1Id: string, user2Id: string) {
   const { data: subs } = await supabase
-    .from('push_subscriptions').select('subscription')
+    .from('push_subscriptions')
+    .select('user_id, subscription')
     .in('user_id', [user1Id, user2Id])
 
+  if (!subs || subs.length === 0) {
+    console.log('No push subscriptions found for users', user1Id, user2Id)
+    return
+  }
+
   const msg = MATCH_MESSAGES[Math.floor(Math.random() * MATCH_MESSAGES.length)]
+  const payload = JSON.stringify({ title: msg.title, body: msg.body, type: 'match' })
 
-  const payload = JSON.stringify({
-    title: msg.title,
-    body: msg.body,
-    type: 'match',
-  })
+  const stale: string[] = []
 
-  const promises = (subs || []).map(({ subscription }) => {
-    try { return webpush.sendNotification(JSON.parse(subscription), payload) }
-    catch { return Promise.resolve() }
-  })
+  await Promise.allSettled(subs.map(async ({ user_id, subscription }) => {
+    try {
+      await webpush.sendNotification(JSON.parse(subscription), payload)
+    } catch (err: any) {
+      console.error('Push failed for', user_id, err.statusCode)
+      if (err.statusCode === 410) stale.push(user_id)
+    }
+  }))
 
-  await Promise.allSettled(promises)
+  if (stale.length > 0) {
+    await supabase.from('push_subscriptions').delete().in('user_id', stale)
+  }
 }

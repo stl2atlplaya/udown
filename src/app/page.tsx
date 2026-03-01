@@ -572,7 +572,7 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
                 <div style={{textAlign:'center' as const,padding:'1rem',border:'1px solid rgba(232,165,152,0.15)'}}>
                   <div style={{fontSize:'1.2rem',marginBottom:'0.4rem'}}>{signalSent === 'onmyway' ? '🌙' : '⏰'}</div>
                   <div style={{fontSize:'0.78rem',color:'#F5F0E8'}}>
-                    {signalSent === 'onmyway' ? 'They know you're on your way.' : `They know to expect you at ${suggestedTime}.`}
+                    {signalSent === 'onmyway' ? 'They know you&apos;re on your way.' : `They know to expect you at ${suggestedTime}.`}
                   </div>
                 </div>
               )}

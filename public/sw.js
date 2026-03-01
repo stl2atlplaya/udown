@@ -7,7 +7,6 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(clients.claim());
 });
 
-// Handle push notifications
 self.addEventListener('push', (event) => {
   if (!event.data) return;
 
@@ -23,7 +22,7 @@ self.addEventListener('push', (event) => {
     actions: type === 'daily'
       ? [
           { action: 'yes', title: '✓ Yeah' },
-          { action: 'no', title: '✗ Not tonight' }
+          { action: 'snooze', title: '⏱ 1 hour' },
         ]
       : [],
     tag: type === 'daily' ? 'daily-prompt' : 'match-result',
@@ -35,42 +34,79 @@ self.addEventListener('push', (event) => {
   );
 });
 
-// Handle notification clicks & action buttons
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const { action } = event;
   const { type } = event.notification.data;
 
-  if (type === 'daily' && (action === 'yes' || action === 'no')) {
-    // Direct action from notification tray — post to API
+  if (type === 'daily' && action === 'yes') {
+    // Get userId from IndexedDB or open the app
     event.waitUntil(
-      fetch('/api/respond', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ response: action }),
-      }).then(() => {
-        return self.registration.showNotification(
-          action === 'yes' ? 'Got it 👀' : 'No worries.',
-          {
-            body: action === 'yes'
-              ? 'Waiting to hear from your partner...'
-              : 'We\'ll check again tomorrow.',
-            icon: '/icon-192.png',
-            tag: 'response-confirm',
-          }
-        );
+      getStoredUserId().then(userId => {
+        if (userId) {
+          return fetch('/api/respond', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ userId, response: 'yes' }),
+          }).then(() => {
+            return self.registration.showNotification('Got it 👀', {
+              body: "Waiting to hear from your partner...",
+              icon: '/icon-192.png',
+              tag: 'response-confirm',
+            });
+          });
+        } else {
+          return openApp();
+        }
+      })
+    );
+  } else if (type === 'daily' && action === 'snooze') {
+    event.waitUntil(
+      getStoredUserId().then(userId => {
+        if (userId) {
+          return fetch('/api/remind', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId }),
+          }).then(() => {
+            return self.registration.showNotification("Got it. See you in an hour. 🌙", {
+              body: "We'll check back in around then.",
+              icon: '/icon-192.png',
+              tag: 'snooze-confirm',
+            });
+          });
+        }
       })
     );
   } else {
-    // Open the app
-    event.waitUntil(
-      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-        if (clientList.length > 0) {
-          return clientList[0].focus();
-        }
-        return clients.openWindow('/');
-      })
-    );
+    event.waitUntil(openApp());
   }
 });
+
+function openApp() {
+  return clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+    if (clientList.length > 0) return clientList[0].focus();
+    return clients.openWindow('/');
+  });
+}
+
+function getStoredUserId() {
+  return new Promise((resolve) => {
+    try {
+      const request = indexedDB.open('udown', 1);
+      request.onsuccess = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('user')) return resolve(null);
+        const tx = db.transaction('user', 'readonly');
+        const store = tx.objectStore('user');
+        const get = store.get('userId');
+        get.onsuccess = () => resolve(get.result || null);
+        get.onerror = () => resolve(null);
+      };
+      request.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+}

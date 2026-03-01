@@ -58,6 +58,23 @@ function getTodayPosition() {
   return POSITIONS[seed % POSITIONS.length]
 }
 
+
+// Store userId in IndexedDB so service worker can access it
+function storeUserIdForSW(userId: string) {
+  try {
+    const request = indexedDB.open('udown', 1)
+    request.onupgradeneeded = (e: any) => {
+      const db = e.target.result
+      if (!db.objectStoreNames.contains('user')) db.createObjectStore('user')
+    }
+    request.onsuccess = (e: any) => {
+      const db = e.target.result
+      const tx = db.transaction('user', 'readwrite')
+      tx.objectStore('user').put(userId, 'userId')
+    }
+  } catch {}
+}
+
 export default function App() {
   const [screen, setScreen] = useState<Screen>('landing')
   const [user, setUser] = useState<User | null>(null)
@@ -117,6 +134,14 @@ export default function App() {
     return { current: (lastMatch === today || lastMatch === yesterday) ? tempStreak : 0, longest: Math.max(longest, tempStreak) }
   }
 
+  const enablePush = async (userId: string) => {
+    try {
+      storeUserIdForSW(userId)
+      const sub = await registerPush()
+      if (sub) await fetch('/api/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription: sub, userId }) })
+    } catch (e) { console.error('Push failed:', e) }
+  }
+
   const loadProfile = useCallback(async (userId: string) => {
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
     setProfile(data)
@@ -152,6 +177,7 @@ export default function App() {
           setPremiumData(pd)
         }
       }
+      enablePush(userId)
       setCoupleStatus('linked')
       setScreen('home')
     } else {
@@ -164,12 +190,6 @@ export default function App() {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(console.error)
   }, [])
 
-  const enablePush = async (userId: string) => {
-    try {
-      const sub = await registerPush()
-      if (sub) await fetch('/api/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription: sub, userId }) })
-    } catch (e) { console.error('Push failed:', e) }
-  }
 
   const handleUpgrade = async (priceId: string) => {
     if (!user || !profile) return
@@ -467,7 +487,7 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
               </div>
             )}
 
-            <Dashboard currentStreak={currentStreak} longestStreak={longestStreak} position={position} label="Tonight's suggestion" isPremium={isPremium} posRating={posRating} onRatePosition={onRatePosition} onUpgrade={onUpgrade} />
+            <Dashboard currentStreak={currentStreak} longestStreak={longestStreak} />
           </div>
 
         ) : todayResponse ? (
@@ -481,7 +501,7 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
               <MatchCalendar history={premiumData.history} />
             )}
 
-            <Dashboard currentStreak={currentStreak} longestStreak={longestStreak} position={position} label="Position of the day" isPremium={isPremium} posRating={posRating} onRatePosition={onRatePosition} onUpgrade={onUpgrade} />
+            <Dashboard currentStreak={currentStreak} longestStreak={longestStreak} />
 
             {isPremium && premiumData?.notes?.length > 0 && (
               <div style={{marginTop:'1rem',width:'100%',maxWidth:'340px'}}>
@@ -537,36 +557,16 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
   )
 }
 
-function Dashboard({ currentStreak, longestStreak, position, label, isPremium, posRating, onRatePosition, onUpgrade }: any) {
+function Dashboard({ currentStreak, longestStreak }: any) {
   return (
-    <div style={{marginTop:'2rem',width:'100%',maxWidth:'340px',display:'flex',flexDirection:'column',gap:'1rem'}}>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem'}}>
-        <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1.2rem',textAlign:'center'}}>
-          <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'2.2rem',fontStyle:'italic',color:'#F5F0E8',lineHeight:1}}>{currentStreak}</div>
-          <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginTop:'0.3rem'}}>Current Streak</div>
-        </div>
-        <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1.2rem',textAlign:'center'}}>
-          <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'2.2rem',fontStyle:'italic',color:'#F5F0E8',lineHeight:1}}>{longestStreak}</div>
-          <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginTop:'0.3rem'}}>Longest Streak</div>
-        </div>
+    <div style={{marginTop:'2rem',width:'100%',maxWidth:'340px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem'}}>
+      <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1.2rem',textAlign:'center'}}>
+        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'2.2rem',fontStyle:'italic',color:'#F5F0E8',lineHeight:1}}>{currentStreak}</div>
+        <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginTop:'0.3rem'}}>Current Streak</div>
       </div>
-      <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1.4rem',display:'flex',flexDirection:'column',gap:'0.6rem'}}>
-        <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C'}}>{label}</div>
-        <div style={{width:'100%',height:'110px',opacity:0.85,marginBottom:'0.4rem'}}>{position.svg}</div>
-        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'1.4rem',fontStyle:'italic',color:'#E8A598'}}>{position.name}</div>
-        <div style={{fontSize:'0.78rem',lineHeight:1.7,color:'#8A847C'}}>{position.description}</div>
-        {isPremium ? (
-          <div style={{display:'flex',gap:'0.5rem',marginTop:'0.3rem'}}>
-            {[['loved','❤️ Loved'],['tried','✓ Tried'],['next','→ Try next']].map(([key, lbl]) => (
-              <button key={key} onClick={() => onRatePosition(position.name, key)}
-                style={{flex:1,padding:'0.4rem',border:`1px solid ${posRating === key ? '#E8A598' : 'rgba(232,165,152,0.15)'}`,background:posRating === key ? 'rgba(232,165,152,0.1)' : 'none',color:posRating === key ? '#E8A598' : '#8A847C',fontSize:'0.6rem',cursor:'pointer'}}>
-                {lbl}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <button onClick={onUpgrade} style={{fontSize:'0.65rem',color:'#8A847C',background:'none',border:'none',cursor:'pointer',textDecoration:'underline',textAlign:'left' as const,padding:0}}>⭐ Rate this position with Plus</button>
-        )}
+      <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1.2rem',textAlign:'center'}}>
+        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'2.2rem',fontStyle:'italic',color:'#F5F0E8',lineHeight:1}}>{longestStreak}</div>
+        <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginTop:'0.3rem'}}>Longest Streak</div>
       </div>
     </div>
   )

@@ -430,6 +430,8 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
   const [noteSaved, setNoteSaved] = useState(false)
   const [notifStatus, setNotifStatus] = useState<'unknown'|'granted'|'denied'|'dismissed'>('unknown')
   const [signalSent, setSignalSent] = useState<'none'|'onmyway'|'time'>('none')
+  const [tapCount, setTapCount] = useState(0)
+  const tapTimer = useRef<any>(null)
   const [suggestedTime, setSuggestedTime] = useState('')
   const [showTimePicker, setShowTimePicker] = useState(false)
   const hour = new Date().getHours()
@@ -478,7 +480,13 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
   return (
     <div className={styles.screen}>
       <div className={styles.homeHeader}>
-        <div className={styles.logo}>u<em>Down</em></div>
+        <div className={styles.logo} onClick={() => {
+          const next = tapCount + 1
+          setTapCount(next)
+          clearTimeout(tapTimer.current)
+          if (next >= 5) { setTapCount(0); window.location.href = '/test' }
+          else { tapTimer.current = setTimeout(() => setTapCount(0), 2000) }
+        }}>u<em>Down</em></div>
         <div className={styles.homeHeaderRight}>
           {yesCount > 0 && <div className={styles.yesCounter} title="Times you've both said yes">✦ {yesCount}</div>}
           {!isPremium && <button onClick={onUpgrade} style={{fontSize:'0.6rem',letterSpacing:'0.08em',color:'#E8A598',background:'none',border:'1px solid rgba(232,165,152,0.3)',padding:'0.2rem 0.5rem',cursor:'pointer',textTransform:'uppercase'}}>Plus</button>}

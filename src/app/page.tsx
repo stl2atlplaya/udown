@@ -94,6 +94,7 @@ export default function App() {
   const [currentStreak, setCurrentStreak] = useState(0)
   const [longestStreak, setLongestStreak] = useState(0)
   const [premiumData, setPremiumData] = useState<any>(null)
+  const [coupleMeta, setCoupleMeta] = useState<any>(null)
   const isRecovery = useRef(false)
 
   useEffect(() => {
@@ -155,6 +156,7 @@ export default function App() {
         setPartnerName(pp?.name || 'your partner')
         const today = new Date().toISOString().split('T')[0]
         if (couple.last_match === today) setMatched(true)
+        setCoupleMeta(couple)
         const [myRes, partnerRes] = await Promise.all([
           supabase.from('daily_responses').select('date,response,mood').eq('couple_id', data.couple_id).eq('user_id', userId),
           supabase.from('daily_responses').select('date,response,mood').eq('couple_id', data.couple_id).eq('user_id', pid),
@@ -421,7 +423,7 @@ function Upgrade({ profile, onUpgrade, onBack }: { profile: Profile | null; onUp
   )
 }
 
-function Home({ profile, partnerName, todayResponse, todayMood, matched, partnerMood, yesCount, currentStreak, longestStreak, premiumData, coupleId, userId, onRespond, onRatePosition, onSaveNote, onUpgrade, onSettings, onSignOut }: any) {
+function Home({ profile, partnerName, todayResponse, todayMood, matched, partnerMood, yesCount, currentStreak, longestStreak, premiumData, coupleId, userId, coupleMeta, onRespond, onRatePosition, onSaveNote, onUpgrade, onSettings, onSignOut }: any) {
   const [loading, setLoading] = useState(false)
   const [selectedMood, setSelectedMood] = useState<string | null>(null)
   const [showMoodPicker, setShowMoodPicker] = useState(false)
@@ -466,10 +468,11 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
     }
   }
 
-  const sendSignal = async (type: 'on_my_way' | 'time', time?: string) => {
+  const sendSignal = async (type: string, time?: string) => {
     await fetch('/api/signal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, type, time }) })
     setSignalSent(type === 'on_my_way' ? 'onmyway' : 'time')
     setShowTimePicker(false)
+    setSuggestedTime('')
   }
 
   const matchedMoodLabel = MOODS.find(m => m.key === partnerMood)?.label
@@ -537,7 +540,42 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
               )}
             </div>
 
+            {/* Confirmed time — show prominently if set */}
+            {coupleMeta?.confirmed_time && (
+              <div style={{width:'100%',maxWidth:'340px',marginBottom:'1.5rem',border:'1px solid rgba(232,165,152,0.4)',padding:'1.2rem',textAlign:'center' as const,background:'rgba(232,165,152,0.06)'}}>
+                <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginBottom:'0.4rem'}}>Tonight at</div>
+                <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'2rem',fontStyle:'italic',color:'#E8A598'}}>{coupleMeta.confirmed_time}</div>
+                <div style={{fontSize:'0.68rem',color:'#8A847C',marginTop:'0.4rem'}}>confirmed ✦</div>
+              </div>
+            )}
+
+            {/* Incoming time suggestion from partner */}
+            {coupleMeta?.suggested_time && coupleMeta?.suggested_by !== userId && !coupleMeta?.confirmed_time && (
+              <div style={{width:'100%',maxWidth:'340px',marginBottom:'1.5rem',border:'1px solid rgba(232,165,152,0.25)',padding:'1.2rem',display:'flex',flexDirection:'column' as const,gap:'0.8rem'}}>
+                <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C'}}>They suggested</div>
+                <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'2rem',fontStyle:'italic',color:'#E8A598',textAlign:'center' as const}}>{coupleMeta.suggested_time}</div>
+                <div style={{display:'flex',gap:'0.6rem'}}>
+                  <button className="btn btn-yes" style={{flex:1,padding:'0.7rem',fontSize:'0.78rem'}}
+                    onClick={() => sendSignal('approve_time')}>
+                    ✓ Works for me
+                  </button>
+                  <button className="btn btn-ghost" style={{flex:1,padding:'0.7rem',fontSize:'0.78rem'}}
+                    onClick={() => setShowTimePicker(true)}>
+                    ↩ Suggest another
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Pending outgoing suggestion */}
+            {coupleMeta?.suggested_time && coupleMeta?.suggested_by === userId && !coupleMeta?.confirmed_time && (
+              <div style={{width:'100%',maxWidth:'340px',marginBottom:'1.5rem',border:'1px solid rgba(138,132,124,0.2)',padding:'1rem',textAlign:'center' as const}}>
+                <div style={{fontSize:'0.68rem',color:'#8A847C'}}>You suggested <span style={{color:'#F5F0E8'}}>{coupleMeta.suggested_time}</span> — waiting on them</div>
+              </div>
+            )}
+
             {/* Signal section */}
+            {!coupleMeta?.confirmed_time && !coupleMeta?.suggested_time && (
             <div style={{width:'100%',maxWidth:'340px',marginBottom:'1.5rem'}}>
               <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginBottom:'0.8rem',textAlign:'center' as const}}>Let them know</div>
 
@@ -564,7 +602,7 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
                       />
                       <div style={{display:'flex',gap:'0.5rem'}}>
                         <button className="btn btn-yes" style={{flex:1,padding:'0.6rem',fontSize:'0.75rem'}}
-                          onClick={() => suggestedTime && sendSignal('time', suggestedTime)}
+                          onClick={() => suggestedTime && sendSignal('suggest_time', suggestedTime)}
                           disabled={!suggestedTime}>
                           Send ✦
                         </button>
@@ -580,11 +618,29 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
                 <div style={{textAlign:'center' as const,padding:'1rem',border:'1px solid rgba(232,165,152,0.15)'}}>
                   <div style={{fontSize:'1.2rem',marginBottom:'0.4rem'}}>{signalSent === 'onmyway' ? '🌙' : '⏰'}</div>
                   <div style={{fontSize:'0.78rem',color:'#F5F0E8'}}>
-                    {signalSent === 'onmyway' ? 'They know you&apos;re on your way.' : `They know to expect you at ${suggestedTime}.`}
+                    {signalSent === 'onmyway' ? 'They know you&apos;re on your way.' : `They suggested ${suggestedTime} — waiting on them.`}
                   </div>
                 </div>
               )}
             </div>
+            )}
+
+            {/* Show suggest time picker when countering */}
+            {coupleMeta?.suggested_time && coupleMeta?.suggested_by !== userId && showTimePicker && (
+              <div style={{width:'100%',maxWidth:'340px',marginBottom:'1.5rem',border:'1px solid rgba(232,165,152,0.2)',padding:'1rem',display:'flex',flexDirection:'column' as const,gap:'0.6rem'}}>
+                <div style={{fontSize:'0.68rem',color:'#8A847C'}}>Suggest a different time</div>
+                <input type="time" value={suggestedTime} onChange={e => setSuggestedTime(e.target.value)}
+                  style={{background:'rgba(245,240,232,0.05)',border:'1px solid rgba(232,165,152,0.2)',color:'#F5F0E8',padding:'0.6rem',fontSize:'1rem',textAlign:'center' as const,width:'100%',boxSizing:'border-box' as const}} />
+                <div style={{display:'flex',gap:'0.5rem'}}>
+                  <button className="btn btn-yes" style={{flex:1,padding:'0.6rem',fontSize:'0.75rem'}}
+                    onClick={() => suggestedTime && sendSignal('suggest_time', suggestedTime)} disabled={!suggestedTime}>
+                    Send ✦
+                  </button>
+                  <button className="btn btn-ghost" style={{flex:1,padding:'0.6rem',fontSize:'0.75rem'}}
+                    onClick={() => setShowTimePicker(false)}>Cancel</button>
+                </div>
+              </div>
+            )}
 
             {/* Match counter in header already shown, just streaks here */}
             <div style={{width:'100%',maxWidth:'340px',fontSize:'0.65rem',color:'#8A847C',textAlign:'center' as const,lineHeight:1.8}}>

@@ -148,7 +148,7 @@ export default function App() {
     setProfile(data)
     if (data?.couple_id) {
       setCoupleId(data.couple_id)
-      const { data: couple } = await supabase.from('couples').select('user1_id, user2_id, last_match').eq('id', data.couple_id).single()
+      const { data: couple } = await supabase.from('couples').select('user1_id, user2_id, last_match, suggested_time, suggested_by, confirmed_time').eq('id', data.couple_id).single()
       if (couple) {
         const pid = couple.user1_id === userId ? couple.user2_id : couple.user1_id
         setPartnerId(pid)

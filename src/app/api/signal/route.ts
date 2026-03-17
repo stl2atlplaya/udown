@@ -13,47 +13,82 @@ webpush.setVapidDetails(
   process.env.VAPID_PRIVATE_KEY!
 )
 
+async function sendPush(userId: string, payload: object) {
+  const { data: sub } = await supabase
+    .from('push_subscriptions').select('subscription').eq('user_id', userId).single()
+  if (!sub) return
+  try {
+    await webpush.sendNotification(JSON.parse(sub.subscription), JSON.stringify(payload))
+  } catch (err: any) {
+    if (err.statusCode === 410) {
+      await supabase.from('push_subscriptions').delete().eq('user_id', userId)
+    }
+  }
+}
+
 export async function POST(req: NextRequest) {
   const { userId, type, time } = await req.json()
 
   const { data: profile } = await supabase
     .from('profiles').select('couple_id, name').eq('id', userId).single()
-
   if (!profile?.couple_id) return NextResponse.json({ error: 'Not coupled' }, { status: 400 })
 
   const { data: couple } = await supabase
     .from('couples').select('user1_id, user2_id')
     .eq('id', profile.couple_id).single()
-
   if (!couple) return NextResponse.json({ error: 'No couple' }, { status: 400 })
 
   const partnerId = couple.user1_id === userId ? couple.user2_id : couple.user1_id
 
-  const { data: partnerSub } = await supabase
-    .from('push_subscriptions').select('subscription')
-    .eq('user_id', partnerId).single()
-
-  if (!partnerSub) return NextResponse.json({ error: 'Partner not subscribed' }, { status: 400 })
-
-  const payload = type === 'on_my_way'
-    ? JSON.stringify({
-        title: "🌙 On my way.",
-        body: "See you soon.",
-        type: 'signal',
-      })
-    : JSON.stringify({
-        title: `✦ Tonight at ${time}`,
-        body: "It's on the calendar. Don't be late. 🌙",
-        type: 'signal',
-      })
-
-  try {
-    await webpush.sendNotification(JSON.parse(partnerSub.subscription), payload)
+  // On my way
+  if (type === 'on_my_way') {
+    await sendPush(partnerId, {
+      title: "🌙 On my way.",
+      body: "See you soon.",
+      type: 'signal',
+    })
     return NextResponse.json({ success: true })
-  } catch (err: any) {
-    if (err.statusCode === 410) {
-      await supabase.from('push_subscriptions').delete().eq('user_id', partnerId)
-    }
-    return NextResponse.json({ error: 'Failed to send' }, { status: 500 })
   }
+
+  // Suggest a time
+  if (type === 'suggest_time') {
+    await supabase.from('couples').update({
+      suggested_time: time,
+      suggested_by: userId,
+      confirmed_time: null,
+    }).eq('id', profile.couple_id)
+
+    await sendPush(partnerId, {
+      title: `✦ Tonight at ${time}`,
+      body: "Does that work for you?",
+      type: 'time_suggestion',
+      coupleId: profile.couple_id,
+      time,
+    })
+    return NextResponse.json({ success: true })
+  }
+
+  // Approve suggested time
+  if (type === 'approve_time') {
+    const { data: coupleData } = await supabase
+      .from('couples').select('suggested_time, suggested_by')
+      .eq('id', profile.couple_id).single()
+
+    const confirmedTime = coupleData?.suggested_time
+    await supabase.from('couples').update({
+      confirmed_time: confirmedTime,
+      suggested_time: null,
+      suggested_by: null,
+    }).eq('id', profile.couple_id)
+
+    // Notify the person who suggested
+    await sendPush(coupleData?.suggested_by, {
+      title: `✦ ${confirmedTime} is confirmed.`,
+      body: "See you then. 🌙",
+      type: 'time_confirmed',
+    })
+    return NextResponse.json({ success: true, confirmedTime })
+  }
+
+  return NextResponse.json({ error: 'Unknown type' }, { status: 400 })
 }

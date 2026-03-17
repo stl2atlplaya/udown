@@ -549,98 +549,90 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
               </div>
             )}
 
-            {/* Incoming time suggestion from partner */}
-            {coupleMeta?.suggested_time && coupleMeta?.suggested_by !== userId && !coupleMeta?.confirmed_time && (
-              <div style={{width:'100%',maxWidth:'340px',marginBottom:'1.5rem',border:'1px solid rgba(232,165,152,0.25)',padding:'1.2rem',display:'flex',flexDirection:'column' as const,gap:'0.8rem'}}>
-                <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C'}}>They suggested</div>
-                <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'2rem',fontStyle:'italic',color:'#E8A598',textAlign:'center' as const}}>{coupleMeta.suggested_time}</div>
-                <div style={{display:'flex',gap:'0.6rem'}}>
-                  <button className="btn btn-yes" style={{flex:1,padding:'0.7rem',fontSize:'0.78rem'}}
-                    onClick={() => sendSignal('approve_time')}>
-                    ✓ Works for me
-                  </button>
-                  <button className="btn btn-ghost" style={{flex:1,padding:'0.7rem',fontSize:'0.78rem'}}
-                    onClick={() => setShowTimePicker(true)}>
-                    ↩ Suggest another
-                  </button>
-                </div>
-              </div>
-            )}
+            {/* Time suggestion flow */}
+            {!coupleMeta?.confirmed_time && (() => {
+              const iSuggested = coupleMeta?.suggested_time && coupleMeta?.suggested_by === userId
+              const theySuggested = coupleMeta?.suggested_time && coupleMeta?.suggested_by !== userId
+              const noSuggestion = !coupleMeta?.suggested_time
 
-            {/* Pending outgoing suggestion */}
-            {coupleMeta?.suggested_time && coupleMeta?.suggested_by === userId && !coupleMeta?.confirmed_time && (
-              <div style={{width:'100%',maxWidth:'340px',marginBottom:'1.5rem',border:'1px solid rgba(138,132,124,0.2)',padding:'1rem',textAlign:'center' as const}}>
-                <div style={{fontSize:'0.68rem',color:'#8A847C'}}>You suggested <span style={{color:'#F5F0E8'}}>{coupleMeta.suggested_time}</span> — waiting on them</div>
-              </div>
-            )}
+              return (
+                <div style={{width:'100%',maxWidth:'340px',marginBottom:'1.5rem'}}>
 
-            {/* Signal section */}
-            {!coupleMeta?.confirmed_time && !coupleMeta?.suggested_time && (
-            <div style={{width:'100%',maxWidth:'340px',marginBottom:'1.5rem'}}>
-              <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginBottom:'0.8rem',textAlign:'center' as const}}>Let them know</div>
+                  {/* I suggested — waiting on partner */}
+                  {iSuggested && !showTimePicker && (
+                    <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1.2rem',display:'flex',flexDirection:'column' as const,gap:'0.5rem',textAlign:'center' as const}}>
+                      <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C'}}>You suggested</div>
+                      <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'2rem',fontStyle:'italic',color:'#E8A598'}}>{coupleMeta.suggested_time}</div>
+                      <div style={{fontSize:'0.7rem',color:'#8A847C'}}>Awaiting your partner&apos;s response</div>
+                    </div>
+                  )}
 
-              {signalSent === 'none' ? (
-                <div style={{display:'flex',flexDirection:'column' as const,gap:'0.6rem'}}>
-                  <button className="btn btn-yes" onClick={() => sendSignal('on_my_way')}
-                    style={{width:'100%',padding:'0.9rem',fontSize:'0.82rem',letterSpacing:'0.05em'}}>
-                    🌙 On my way now
-                  </button>
-
-                  {!showTimePicker ? (
-                    <button className="btn btn-ghost" onClick={() => setShowTimePicker(true)}
-                      style={{width:'100%',padding:'0.9rem',fontSize:'0.82rem'}}>
-                      ⏰ Suggest a time
-                    </button>
-                  ) : (
-                    <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1rem',display:'flex',flexDirection:'column' as const,gap:'0.6rem'}}>
-                      <div style={{fontSize:'0.68rem',color:'#8A847C'}}>What time works for you?</div>
-                      <input
-                        type="time"
-                        value={suggestedTime}
-                        onChange={e => setSuggestedTime(e.target.value)}
-                        style={{background:'rgba(245,240,232,0.05)',border:'1px solid rgba(232,165,152,0.2)',color:'#F5F0E8',padding:'0.6rem',fontSize:'1rem',textAlign:'center' as const,width:'100%',boxSizing:'border-box' as const}}
-                      />
-                      <div style={{display:'flex',gap:'0.5rem'}}>
-                        <button className="btn btn-yes" style={{flex:1,padding:'0.6rem',fontSize:'0.75rem'}}
-                          onClick={() => suggestedTime && sendSignal('suggest_time', suggestedTime)}
-                          disabled={!suggestedTime}>
-                          Send ✦
+                  {/* Partner suggested — my turn to respond */}
+                  {theySuggested && !showTimePicker && (
+                    <div style={{border:'1px solid rgba(232,165,152,0.25)',padding:'1.2rem',display:'flex',flexDirection:'column' as const,gap:'0.8rem'}}>
+                      <div style={{textAlign:'center' as const}}>
+                        <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginBottom:'0.4rem'}}>They suggested</div>
+                        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'2rem',fontStyle:'italic',color:'#E8A598'}}>{coupleMeta.suggested_time}</div>
+                      </div>
+                      <div style={{display:'flex',gap:'0.6rem'}}>
+                        <button className="btn btn-yes" style={{flex:1,padding:'0.7rem',fontSize:'0.78rem'}}
+                          onClick={() => sendSignal('approve_time')}>
+                          ✓ Works for me
                         </button>
-                        <button className="btn btn-ghost" style={{flex:1,padding:'0.6rem',fontSize:'0.75rem'}}
-                          onClick={() => setShowTimePicker(false)}>
-                          Cancel
+                        <button className="btn btn-ghost" style={{flex:1,padding:'0.7rem',fontSize:'0.78rem'}}
+                          onClick={() => { setShowTimePicker(true); setSuggestedTime('') }}>
+                          ↩ New time
                         </button>
                       </div>
                     </div>
                   )}
-                </div>
-              ) : (
-                <div style={{textAlign:'center' as const,padding:'1rem',border:'1px solid rgba(232,165,152,0.15)'}}>
-                  <div style={{fontSize:'1.2rem',marginBottom:'0.4rem'}}>{signalSent === 'onmyway' ? '🌙' : '⏰'}</div>
-                  <div style={{fontSize:'0.78rem',color:'#F5F0E8'}}>
-                    {signalSent === 'onmyway' ? 'They know you&apos;re on your way.' : `They suggested ${suggestedTime} — waiting on them.`}
-                  </div>
-                </div>
-              )}
-            </div>
-            )}
 
-            {/* Show suggest time picker when countering */}
-            {coupleMeta?.suggested_time && coupleMeta?.suggested_by !== userId && showTimePicker && (
-              <div style={{width:'100%',maxWidth:'340px',marginBottom:'1.5rem',border:'1px solid rgba(232,165,152,0.2)',padding:'1rem',display:'flex',flexDirection:'column' as const,gap:'0.6rem'}}>
-                <div style={{fontSize:'0.68rem',color:'#8A847C'}}>Suggest a different time</div>
-                <input type="time" value={suggestedTime} onChange={e => setSuggestedTime(e.target.value)}
-                  style={{background:'rgba(245,240,232,0.05)',border:'1px solid rgba(232,165,152,0.2)',color:'#F5F0E8',padding:'0.6rem',fontSize:'1rem',textAlign:'center' as const,width:'100%',boxSizing:'border-box' as const}} />
-                <div style={{display:'flex',gap:'0.5rem'}}>
-                  <button className="btn btn-yes" style={{flex:1,padding:'0.6rem',fontSize:'0.75rem'}}
-                    onClick={() => suggestedTime && sendSignal('suggest_time', suggestedTime)} disabled={!suggestedTime}>
-                    Send ✦
-                  </button>
-                  <button className="btn btn-ghost" style={{flex:1,padding:'0.6rem',fontSize:'0.75rem'}}
-                    onClick={() => setShowTimePicker(false)}>Cancel</button>
+                  {/* Time picker — for initial suggestion or counter */}
+                  {showTimePicker && (
+                    <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1rem',display:'flex',flexDirection:'column' as const,gap:'0.6rem'}}>
+                      <div style={{fontSize:'0.68rem',color:'#8A847C'}}>
+                        {theySuggested ? 'Suggest a different time' : 'What time works for you?'}
+                      </div>
+                      <input type="time" value={suggestedTime} onChange={e => setSuggestedTime(e.target.value)}
+                        style={{background:'rgba(245,240,232,0.05)',border:'1px solid rgba(232,165,152,0.2)',color:'#F5F0E8',padding:'0.6rem',fontSize:'1rem',textAlign:'center' as const,width:'100%',boxSizing:'border-box' as const}} />
+                      <div style={{display:'flex',gap:'0.5rem'}}>
+                        <button className="btn btn-yes" style={{flex:1,padding:'0.6rem',fontSize:'0.75rem'}}
+                          onClick={() => suggestedTime && sendSignal('suggest_time', suggestedTime)}
+                          disabled={!suggestedTime}>Send ✦</button>
+                        <button className="btn btn-ghost" style={{flex:1,padding:'0.6rem',fontSize:'0.75rem'}}
+                          onClick={() => setShowTimePicker(false)}>Cancel</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* No suggestion yet — show action buttons */}
+                  {noSuggestion && !showTimePicker && (
+                    <div style={{display:'flex',flexDirection:'column' as const,gap:'0.6rem'}}>
+                      <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginBottom:'0.2rem',textAlign:'center' as const}}>Let them know</div>
+                      {signalSent === 'none' ? (
+                        <>
+                          <button className="btn btn-yes" onClick={() => sendSignal('on_my_way')}
+                            style={{width:'100%',padding:'0.9rem',fontSize:'0.82rem'}}>
+                            🌙 On my way now
+                          </button>
+                          <button className="btn btn-ghost" onClick={() => setShowTimePicker(true)}
+                            style={{width:'100%',padding:'0.9rem',fontSize:'0.82rem'}}>
+                            ⏰ Suggest a time
+                          </button>
+                        </>
+                      ) : (
+                        <div style={{textAlign:'center' as const,padding:'1rem',border:'1px solid rgba(232,165,152,0.15)'}}>
+                          <div style={{fontSize:'0.78rem',color:'#F5F0E8'}}>
+                            {signalSent === 'onmyway' ? '🌙 They know you&apos;re on your way.' : '⏰ Time sent.'}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                 </div>
-              </div>
-            )}
+              )
+            })()}
 
             {/* Match counter in header already shown, just streaks here */}
             <div style={{width:'100%',maxWidth:'340px',fontSize:'0.65rem',color:'#8A847C',textAlign:'center' as const,lineHeight:1.8}}>

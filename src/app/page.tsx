@@ -956,7 +956,7 @@ function MatchCalendar({ history }: { history: any[] }) {
   )
 }
 
-function Settings({ profile, partnerName, yesCount, currentStreak, longestStreak, coupleId, premiumData, onUpgrade, onRemovePartner, onBack, onSaveNotifHour, onSignOut }: any) {
+function Settings({ profile, partnerName, yesCount, currentStreak, longestStreak, coupleId, premiumData, onUpgrade, onRemovePartner, onBack, onSaveNotifHour, onSignOut, coupleMeta }: any) {
   const [notifHour, setNotifHour] = useState(profile?.custom_notif_hour ?? 17)
   const [hourSaved, setHourSaved] = useState(false)
   const isPremium = profile?.is_premium

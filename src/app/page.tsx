@@ -259,6 +259,7 @@ export default function App() {
       profile={profile} partnerName={partnerName} todayResponse={todayResponse} todayMood={todayMood}
       matched={matched} partnerMood={partnerMood} yesCount={yesCount} currentStreak={currentStreak}
       longestStreak={longestStreak} premiumData={premiumData} coupleId={coupleId} userId={user?.id || ''}
+      coupleMeta={coupleMeta} sparkData={sparkData} goalData={goalData} setGoalData={setGoalData}
       onRespond={async (r, mood) => {
         const res = await fetch('/api/respond', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user?.id, response: r }) })
         const data = await res.json()
@@ -835,7 +836,7 @@ function CouplesGoal({ goalData, yesCount, coupleId, userId, showGoalSetter, set
       const data = await res.json()
       console.log('goal save result:', data, 'coupleId:', coupleId, 'target:', goalInput)
       if (data.success) {
-        setGoalData((prev: any) => ({ ...prev, goalTarget: Number(goalInput) }))
+        setGoalData({ goalTarget: Number(goalInput), matchCount: goalData?.matchCount || 0, goalMonth: goalData?.goalMonth })
         setShowGoalSetter(false)
       }
     } catch (e) {

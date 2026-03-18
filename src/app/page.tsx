@@ -207,6 +207,7 @@ export default function App() {
       setGoalData(goalJson)
 
       // Set trial start on first match
+      const today = new Date().toISOString().split('T')[0];
       if (couple.last_match === today && !couple.trial_started_at) {
         await supabase.from('couples').update({ trial_started_at: new Date().toISOString() }).eq('id', data.couple_id)
       }

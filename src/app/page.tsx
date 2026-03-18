@@ -829,11 +829,19 @@ function CouplesGoal({ goalData, yesCount, coupleId, userId, showGoalSetter, set
   const saveGoal = async () => {
     if (!goalInput || isNaN(Number(goalInput))) return
     setSaving(true)
-    await fetch('/api/goal', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ coupleId, userId, target: Number(goalInput) }) })
-    setGoalData({ ...goalData, goalTarget: Number(goalInput), matchCount: goalData?.matchCount || 0 })
+    try {
+      const res = await fetch('/api/goal', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ coupleId, userId, target: Number(goalInput) }) })
+      const data = await res.json()
+      console.log('goal save result:', data, 'coupleId:', coupleId, 'target:', goalInput)
+      if (data.success) {
+        setGoalData((prev: any) => ({ ...prev, goalTarget: Number(goalInput) }))
+        setShowGoalSetter(false)
+      }
+    } catch (e) {
+      console.error('goal save error:', e)
+    }
     setSaving(false)
-    setShowGoalSetter(false)
   }
 
   const target = goalData?.goalTarget

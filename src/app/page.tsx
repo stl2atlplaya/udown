@@ -173,7 +173,7 @@ export default function App() {
         const { data: pp } = await supabase.from('profiles').select('name').eq('id', pid).single()
         setPartnerName(pp?.name || 'your partner')
         const today = new Date().toISOString().split('T')[0]
-        if (couple?.last_match === today) setMatched(true)
+        if (couple.last_match === today) setMatched(true)
         setCoupleMeta(couple)
         const [myRes, partnerRes] = await Promise.all([
           supabase.from('daily_responses').select('date,response,mood').eq('couple_id', data.couple_id).eq('user_id', userId),
@@ -182,14 +182,16 @@ export default function App() {
         const myYes = (myRes.data || []).filter((r: any) => r.response === 'yes')
         const partnerYes = (partnerRes.data || []).filter((r: any) => r.response === 'yes')
         const mySet = new Set(myYes.map((r: any) => r.date))
-        setYesCount(partnerYes.filter((r: any) => mySet.has(r.date)).length)
+        const mutualMatches = partnerYes.filter((r: any) => mySet.has(r.date))
+        console.log('yesCount debug:', { myYesDates: myYes.map((r:any)=>r.date), partnerYesDates: partnerYes.map((r:any)=>r.date), mutual: mutualMatches.length })
+        setYesCount(mutualMatches.length)
         const streaks = calculateStreaks(myYes.map((r: any) => r.date), partnerYes.map((r: any) => r.date))
         setCurrentStreak(streaks.current)
         setLongestStreak(streaks.longest)
         const todayMyResp = (myRes.data || []).find((r: any) => r.date === today)
         const todayPartnerResp = (partnerRes.data || []).find((r: any) => r.date === today)
         if (todayMyResp) { setTodayResponse(todayMyResp.response as 'yes' | 'no'); setTodayMood(todayMyResp.mood) }
-       if (todayPartnerResp?.mood && couple?.last_match === today) setPartnerMood(todayPartnerResp.mood)
+        if (todayPartnerResp?.mood && couple.last_match === today) setPartnerMood(todayPartnerResp.mood)
         // Load premium data
         if (data.is_premium) {
           const res = await fetch(`/api/premium?coupleId=${data.couple_id}&userId=${userId}`)
@@ -207,8 +209,7 @@ export default function App() {
       setGoalData(goalJson)
 
       // Set trial start on first match
-      const today = new Date().toISOString().split('T')[0];
-      if (couple?.last_match === today && !couple?.trial_started_at) {
+      if (couple.last_match === today && !couple.trial_started_at) {
         await supabase.from('couples').update({ trial_started_at: new Date().toISOString() }).eq('id', data.couple_id)
       }
 
@@ -249,7 +250,7 @@ export default function App() {
   if (screen === 'forgot-password') return <ForgotPassword onBack={() => setScreen('login')} />
   if (screen === 'couple-setup') return <CoupleSetup userId={user?.id || ''} generatedCode={generatedCode} setGeneratedCode={setGeneratedCode} inviteCode={inviteCode} setInviteCode={setInviteCode} coupleStatus={coupleStatus} setCoupleStatus={setCoupleStatus} onLinked={() => loadProfile(user!.id)} />
   if (screen === 'upgrade') return <Upgrade profile={profile} onUpgrade={handleUpgrade} onBack={() => setScreen('home')} />
-  if (screen === 'settings') return <Settings profile={profile} partnerName={partnerName} yesCount={yesCount} coupleMeta={coupleMeta} currentStreak={currentStreak} longestStreak={longestStreak} coupleId={coupleId} premiumData={premiumData} onUpgrade={() => setScreen('upgrade')} onRemovePartner={handleRemovePartner} onBack={() => setScreen('home')} onSaveNotifHour={async (h) => { await fetch('/api/premium', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set-notif-hour', userId: user?.id, hour: h }) }); setProfile(p => p ? { ...p, custom_notif_hour: h } : p) }} onSignOut={async () => { await supabase.auth.signOut(); setScreen('landing'); setProfile(null); setTodayResponse(null); setMatched(false) }} />
+  if (screen === 'settings') return <Settings profile={profile} partnerName={partnerName} yesCount={yesCount} currentStreak={currentStreak} longestStreak={longestStreak} coupleId={coupleId} premiumData={premiumData} onUpgrade={() => setScreen('upgrade')} onRemovePartner={handleRemovePartner} onBack={() => setScreen('home')} onSaveNotifHour={async (h) => { await fetch('/api/premium', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set-notif-hour', userId: user?.id, hour: h }) }); setProfile(p => p ? { ...p, custom_notif_hour: h } : p) }} onSignOut={async () => { await supabase.auth.signOut(); setScreen('landing'); setProfile(null); setTodayResponse(null); setMatched(false) }} />
   if (screen === 'home') return (
     <Home
       profile={profile} partnerName={partnerName} todayResponse={todayResponse} todayMood={todayMood}
@@ -692,7 +693,7 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
               <MatchCalendar history={premiumData.history} />
             )}
 
-            <Dashboard yesCount={yesCount} currentStreak={currentStreak} />
+            <Dashboard yesCount={yesCount} currentStreak={currentStreak} longestStreak={longestStreak} />
 
             {/* Couples Goal */}
             <CouplesGoal goalData={goalData} yesCount={yesCount} coupleId={coupleId} userId={userId}
@@ -833,7 +834,7 @@ function CouplesGoal({ goalData, yesCount, coupleId, userId, showGoalSetter, set
   }
 
   const target = goalData?.goalTarget
-  const count = goalData?.matchCount || 0
+  const count = yesCount || 0
   const progress = target ? Math.min(count / target, 1) : 0
   const achieved = target && count >= target
   const currentMonth = new Date().toLocaleString('default', { month: 'long' })
@@ -852,18 +853,13 @@ function CouplesGoal({ goalData, yesCount, coupleId, userId, showGoalSetter, set
         </div>
       ) : !target || showGoalSetter ? (
         <div style={{display:'flex',flexDirection:'column' as const,gap:'0.6rem'}}>
-          <div style={{fontSize:'0.75rem',color:'#8A847C'}}>How many nights together this month?</div>
-          <div style={{display:'flex',gap:'0.5rem'}}>
-            {[2,3,4,5].map(n => (
-              <button key={n} onClick={() => setGoalInput(String(n))}
-                style={{flex:1,padding:'0.6rem',border:`1px solid ${goalInput === String(n) ? '#E8A598' : 'rgba(232,165,152,0.2)'}`,background:goalInput === String(n) ? 'rgba(232,165,152,0.1)' : 'none',color:goalInput === String(n) ? '#E8A598' : '#8A847C',fontSize:'0.82rem',cursor:'pointer'}}>
-                {n}
-              </button>
-            ))}
-          </div>
-          <input type="number" min="1" max="31" placeholder="Or enter custom..." value={goalInput}
-            onChange={e => setGoalInput(e.target.value)}
-            style={{background:'rgba(245,240,232,0.05)',border:'1px solid rgba(232,165,152,0.2)',color:'#F5F0E8',padding:'0.6rem',fontSize:'0.82rem',width:'100%',boxSizing:'border-box' as const}} />
+          <div style={{fontSize:'0.75rem',color:'#8A847C'}}>How many nights together this month? (1–30)</div>
+          <input type="number" min="1" max="30" placeholder="Enter a number..." value={goalInput}
+            onChange={e => {
+              const val = Math.min(30, Math.max(1, parseInt(e.target.value) || 0))
+              setGoalInput(val > 0 ? String(val) : '')
+            }}
+            style={{background:'rgba(245,240,232,0.05)',border:'1px solid rgba(232,165,152,0.2)',color:'#F5F0E8',padding:'0.8rem',fontSize:'1.2rem',width:'100%',boxSizing:'border-box' as const,textAlign:'center' as const}} />
           <div style={{display:'flex',gap:'0.5rem'}}>
             <button className="btn btn-yes" style={{flex:1,padding:'0.6rem',fontSize:'0.75rem'}} onClick={saveGoal} disabled={saving || !goalInput}>
               {saving ? '...' : 'Set goal ✦'}
@@ -900,7 +896,7 @@ function CouplesGoal({ goalData, yesCount, coupleId, userId, showGoalSetter, set
   )
 }
 
-function Dashboard({ yesCount, currentStreak }: any) {
+function Dashboard({ yesCount, currentStreak, longestStreak }: any) {
   return (
     <div style={{marginTop:'2rem',width:'100%',maxWidth:'340px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem'}}>
       <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1.2rem',textAlign:'center' as const}}>
@@ -908,8 +904,12 @@ function Dashboard({ yesCount, currentStreak }: any) {
         <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginTop:'0.3rem'}}>Nights Together</div>
       </div>
       <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1.2rem',textAlign:'center' as const}}>
-        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'2.2rem',fontStyle:'italic',color:'#F5F0E8',lineHeight:1}}>{currentStreak > 0 ? `${currentStreak}🔥` : '—'}</div>
-        <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginTop:'0.3rem'}}>In a Row</div>
+        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'2.2rem',fontStyle:'italic',color:'#F5F0E8',lineHeight:1}}>
+          {currentStreak > 0 ? <span>{currentStreak} 🔥</span> : longestStreak > 0 ? <span>{longestStreak} ⭐</span> : '—'}
+        </div>
+        <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginTop:'0.3rem'}}>
+          {currentStreak > 0 ? 'Current Streak' : 'Consecutive Night Record'}
+        </div>
       </div>
     </div>
   )
@@ -953,7 +953,7 @@ function MatchCalendar({ history }: { history: any[] }) {
   )
 }
 
-function Settings({ profile, partnerName, yesCount, currentStreak, longestStreak, coupleId, premiumData, onUpgrade, onRemovePartner, onBack, onSaveNotifHour, coupleMeta, onSignOut }: any) {
+function Settings({ profile, partnerName, yesCount, currentStreak, longestStreak, coupleId, premiumData, onUpgrade, onRemovePartner, onBack, onSaveNotifHour, onSignOut }: any) {
   const [notifHour, setNotifHour] = useState(profile?.custom_notif_hour ?? 17)
   const [hourSaved, setHourSaved] = useState(false)
   const isPremium = profile?.is_premium

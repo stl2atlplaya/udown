@@ -75,6 +75,22 @@ function storeUserIdForSW(userId: string) {
   } catch {}
 }
 
+
+function isInTrial(trialStartedAt: string | null): boolean {
+  if (!trialStartedAt) return false
+  const trialEnd = new Date(trialStartedAt)
+  trialEnd.setDate(trialEnd.getDate() + 14)
+  return new Date() < trialEnd
+}
+
+function daysLeftInTrial(trialStartedAt: string | null): number {
+  if (!trialStartedAt) return 0
+  const trialEnd = new Date(trialStartedAt)
+  trialEnd.setDate(trialEnd.getDate() + 14)
+  const diff = trialEnd.getTime() - Date.now()
+  return Math.max(0, Math.ceil(diff / 86400000))
+}
+
 export default function App() {
   const [screen, setScreen] = useState<Screen>('landing')
   const [user, setUser] = useState<User | null>(null)
@@ -95,6 +111,8 @@ export default function App() {
   const [longestStreak, setLongestStreak] = useState(0)
   const [premiumData, setPremiumData] = useState<any>(null)
   const [coupleMeta, setCoupleMeta] = useState<any>(null)
+  const [sparkData, setSparkData] = useState<any>(null)
+  const [goalData, setGoalData] = useState<any>(null)
   const isRecovery = useRef(false)
 
   useEffect(() => {
@@ -148,7 +166,7 @@ export default function App() {
     setProfile(data)
     if (data?.couple_id) {
       setCoupleId(data.couple_id)
-      const { data: couple } = await supabase.from('couples').select('user1_id, user2_id, last_match, suggested_time, suggested_by, confirmed_time').eq('id', data.couple_id).single()
+      const { data: couple } = await supabase.from('couples').select('user1_id, user2_id, last_match, suggested_time, suggested_by, confirmed_time, trial_started_at').eq('id', data.couple_id).single()
       if (couple) {
         const pid = couple.user1_id === userId ? couple.user2_id : couple.user1_id
         setPartnerId(pid)
@@ -179,6 +197,20 @@ export default function App() {
           setPremiumData(pd)
         }
       }
+      // Load spark and goal
+      const [sparkRes, goalRes] = await Promise.all([
+        fetch(`/api/spark?coupleId=${data.couple_id}&userId=${userId}`),
+        fetch(`/api/goal?coupleId=${data.couple_id}`),
+      ])
+      const [sparkJson, goalJson] = await Promise.all([sparkRes.json(), goalRes.json()])
+      setSparkData(sparkJson)
+      setGoalData(goalJson)
+
+      // Set trial start on first match
+      if (couple.last_match === today && !couple.trial_started_at) {
+        await supabase.from('couples').update({ trial_started_at: new Date().toISOString() }).eq('id', data.couple_id)
+      }
+
       enablePush(userId)
       setCoupleStatus('linked')
       setScreen('home')
@@ -423,7 +455,7 @@ function Upgrade({ profile, onUpgrade, onBack }: { profile: Profile | null; onUp
   )
 }
 
-function Home({ profile, partnerName, todayResponse, todayMood, matched, partnerMood, yesCount, currentStreak, longestStreak, premiumData, coupleId, userId, coupleMeta, onRespond, onRatePosition, onSaveNote, onUpgrade, onSettings, onSignOut }: any) {
+function Home({ profile, partnerName, todayResponse, todayMood, matched, partnerMood, yesCount, currentStreak, longestStreak, premiumData, coupleId, userId, coupleMeta, sparkData, goalData, setGoalData, onRespond, onRatePosition, onSaveNote, onUpgrade, onSettings, onSignOut }: any) {
   const [loading, setLoading] = useState(false)
   const [selectedMood, setSelectedMood] = useState<string | null>(null)
   const [showMoodPicker, setShowMoodPicker] = useState(false)
@@ -434,12 +466,19 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
   const [signalSent, setSignalSent] = useState<'none'|'onmyway'|'time'>('none')
   const [tapCount, setTapCount] = useState(0)
   const tapTimer = useRef<any>(null)
+  const [sparkReflection, setSparkReflection] = useState('')
+  const [sparkSaved, setSparkSaved] = useState(false)
+  const [showGoalSetter, setShowGoalSetter] = useState(false)
+  const [goalInput, setGoalInput] = useState('')
   const [suggestedTime, setSuggestedTime] = useState('')
   const [showTimePicker, setShowTimePicker] = useState(false)
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Hey' : 'Good evening'
   const position = getTodayPosition()
   const isPremium = profile?.is_premium
+  const inTrial = isInTrial(coupleMeta?.trial_started_at)
+  const hasAccess = isPremium || inTrial
+  const trialDaysLeft = daysLeftInTrial(coupleMeta?.trial_started_at)
   const posRating = premiumData?.ratings?.find((r: any) => r.position_name === position.name)?.rating
 
   const respond = async (r: 'yes' | 'no') => {
@@ -654,6 +693,18 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
 
             <Dashboard yesCount={yesCount} currentStreak={currentStreak} />
 
+            {/* Couples Goal */}
+            <CouplesGoal goalData={goalData} yesCount={yesCount} coupleId={coupleId} userId={userId}
+              showGoalSetter={showGoalSetter} setShowGoalSetter={setShowGoalSetter}
+              goalInput={goalInput} setGoalInput={setGoalInput} setGoalData={setGoalData}
+              hasAccess={hasAccess} onUpgrade={onUpgrade} trialDaysLeft={trialDaysLeft} />
+
+            {/* The Spark */}
+            <SparkSection sparkData={sparkData} coupleId={coupleId} userId={userId}
+              sparkReflection={sparkReflection} setSparkReflection={setSparkReflection}
+              sparkSaved={sparkSaved} setSparkSaved={setSparkSaved}
+              hasAccess={hasAccess} onUpgrade={onUpgrade} trialDaysLeft={trialDaysLeft} />
+
             {isPremium && premiumData?.notes?.length > 0 && (
               <div style={{marginTop:'1rem',width:'100%',maxWidth:'340px'}}>
                 <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginBottom:'0.6rem'}}>Recent notes</div>
@@ -704,6 +755,146 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
         )}
       </div>
       <div className={styles.homeFooter}>Private by design. {partnerName} can't see your answer.</div>
+    </div>
+  )
+}
+
+
+function SparkSection({ sparkData, coupleId, userId, sparkReflection, setSparkReflection, sparkSaved, setSparkSaved, hasAccess, onUpgrade, trialDaysLeft }: any) {
+  const [saving, setSaving] = useState(false)
+  const [showInput, setShowInput] = useState(false)
+
+  if (!sparkData?.prompt) return null
+
+  const saveReflection = async () => {
+    setSaving(true)
+    await fetch('/api/spark', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'save-reflection', coupleId, userId, reflection: sparkReflection }) })
+    setSaving(false)
+    setSparkSaved(true)
+    setShowInput(false)
+  }
+
+  return (
+    <div style={{width:'100%',maxWidth:'340px',marginTop:'1.5rem',border:'1px solid rgba(232,165,152,0.2)',padding:'1.4rem',display:'flex',flexDirection:'column' as const,gap:'0.8rem'}}>
+      <div style={{display:'flex',justifyContent:'space-between' as const,alignItems:'center' as const}}>
+        <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#E8A598'}}>✦ This Week&apos;s Spark</div>
+        {trialDaysLeft > 0 && !hasAccess && <div style={{fontSize:'0.55rem',color:'#8A847C'}}>{trialDaysLeft}d left</div>}
+      </div>
+
+      {!hasAccess ? (
+        <div style={{textAlign:'center' as const}}>
+          <div style={{fontSize:'0.75rem',color:'#8A847C',marginBottom:'0.8rem',lineHeight:1.6}}>Weekly intimacy prompts for you and your partner.</div>
+          <button className="btn btn-ghost" onClick={onUpgrade} style={{fontSize:'0.72rem',padding:'0.5rem 1rem'}}>Unlock with Plus ✦</button>
+        </div>
+      ) : (
+        <>
+          <p style={{fontSize:'0.82rem',color:'#F5F0E8',lineHeight:1.7,fontStyle:'italic'}}>&ldquo;{sparkData.prompt}&rdquo;</p>
+
+          {sparkSaved || sparkData.myReflection ? (
+            <div style={{fontSize:'0.72rem',color:'#8A847C',borderTop:'1px solid rgba(232,165,152,0.1)',paddingTop:'0.6rem'}}>
+              Your reflection saved ✓
+            </div>
+          ) : showInput ? (
+            <div style={{display:'flex',flexDirection:'column' as const,gap:'0.5rem'}}>
+              <textarea value={sparkReflection} onChange={e => setSparkReflection(e.target.value)}
+                placeholder="Your thoughts (private)..."
+                style={{width:'100%',background:'rgba(245,240,232,0.05)',border:'1px solid rgba(232,165,152,0.2)',color:'#F5F0E8',padding:'0.8rem',fontSize:'0.75rem',resize:'none' as const,height:'80px',boxSizing:'border-box' as const,fontFamily:'inherit'}} />
+              <div style={{display:'flex',gap:'0.5rem'}}>
+                <button className="btn btn-yes" style={{flex:1,padding:'0.5rem',fontSize:'0.72rem'}} onClick={saveReflection} disabled={saving || !sparkReflection}>
+                  {saving ? '...' : 'Save'}
+                </button>
+                <button className="btn btn-ghost" style={{flex:1,padding:'0.5rem',fontSize:'0.72rem'}} onClick={() => setShowInput(false)}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <button className="btn btn-ghost" style={{fontSize:'0.72rem',padding:'0.5rem'}} onClick={() => setShowInput(true)}>
+              📝 Add your reflection
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function CouplesGoal({ goalData, yesCount, coupleId, userId, showGoalSetter, setShowGoalSetter, goalInput, setGoalInput, setGoalData, hasAccess, onUpgrade, trialDaysLeft }: any) {
+  const [saving, setSaving] = useState(false)
+
+  const saveGoal = async () => {
+    if (!goalInput || isNaN(Number(goalInput))) return
+    setSaving(true)
+    await fetch('/api/goal', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coupleId, userId, target: Number(goalInput) }) })
+    setGoalData({ ...goalData, goalTarget: Number(goalInput), matchCount: goalData?.matchCount || 0 })
+    setSaving(false)
+    setShowGoalSetter(false)
+  }
+
+  const target = goalData?.goalTarget
+  const count = goalData?.matchCount || 0
+  const progress = target ? Math.min(count / target, 1) : 0
+  const achieved = target && count >= target
+  const currentMonth = new Date().toLocaleString('default', { month: 'long' })
+
+  return (
+    <div style={{width:'100%',maxWidth:'340px',marginTop:'1rem',border:'1px solid rgba(232,165,152,0.2)',padding:'1.4rem',display:'flex',flexDirection:'column' as const,gap:'0.8rem'}}>
+      <div style={{display:'flex',justifyContent:'space-between' as const,alignItems:'center' as const}}>
+        <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#E8A598'}}>✦ {currentMonth} Goal</div>
+        {trialDaysLeft > 0 && !hasAccess && <div style={{fontSize:'0.55rem',color:'#8A847C'}}>{trialDaysLeft}d left</div>}
+      </div>
+
+      {!hasAccess ? (
+        <div style={{textAlign:'center' as const}}>
+          <div style={{fontSize:'0.75rem',color:'#8A847C',marginBottom:'0.8rem',lineHeight:1.6}}>Set a shared monthly goal and track it together.</div>
+          <button className="btn btn-ghost" onClick={onUpgrade} style={{fontSize:'0.72rem',padding:'0.5rem 1rem'}}>Unlock with Plus ✦</button>
+        </div>
+      ) : !target || showGoalSetter ? (
+        <div style={{display:'flex',flexDirection:'column' as const,gap:'0.6rem'}}>
+          <div style={{fontSize:'0.75rem',color:'#8A847C'}}>How many nights together this month?</div>
+          <div style={{display:'flex',gap:'0.5rem'}}>
+            {[2,3,4,5].map(n => (
+              <button key={n} onClick={() => setGoalInput(String(n))}
+                style={{flex:1,padding:'0.6rem',border:`1px solid ${goalInput === String(n) ? '#E8A598' : 'rgba(232,165,152,0.2)'}`,background:goalInput === String(n) ? 'rgba(232,165,152,0.1)' : 'none',color:goalInput === String(n) ? '#E8A598' : '#8A847C',fontSize:'0.82rem',cursor:'pointer'}}>
+                {n}
+              </button>
+            ))}
+          </div>
+          <input type="number" min="1" max="31" placeholder="Or enter custom..." value={goalInput}
+            onChange={e => setGoalInput(e.target.value)}
+            style={{background:'rgba(245,240,232,0.05)',border:'1px solid rgba(232,165,152,0.2)',color:'#F5F0E8',padding:'0.6rem',fontSize:'0.82rem',width:'100%',boxSizing:'border-box' as const}} />
+          <div style={{display:'flex',gap:'0.5rem'}}>
+            <button className="btn btn-yes" style={{flex:1,padding:'0.6rem',fontSize:'0.75rem'}} onClick={saveGoal} disabled={saving || !goalInput}>
+              {saving ? '...' : 'Set goal ✦'}
+            </button>
+            {target && <button className="btn btn-ghost" style={{flex:1,padding:'0.6rem',fontSize:'0.75rem'}} onClick={() => setShowGoalSetter(false)}>Cancel</button>}
+          </div>
+        </div>
+      ) : (
+        <div style={{display:'flex',flexDirection:'column' as const,gap:'0.6rem'}}>
+          {achieved ? (
+            <div style={{textAlign:'center' as const,padding:'0.5rem 0'}}>
+              <div style={{fontSize:'1.5rem',marginBottom:'0.3rem'}}>✦</div>
+              <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'1.1rem',fontStyle:'italic',color:'#E8A598'}}>Goal reached.</div>
+              <div style={{fontSize:'0.68rem',color:'#8A847C',marginTop:'0.2rem'}}>{count} of {target} nights this month</div>
+            </div>
+          ) : (
+            <>
+              <div style={{display:'flex',justifyContent:'space-between' as const,alignItems:'baseline' as const}}>
+                <div style={{fontSize:'0.75rem',color:'#F5F0E8'}}>{count} <span style={{color:'#8A847C'}}>of {target} nights</span></div>
+                <div style={{fontSize:'0.68rem',color:'#8A847C'}}>{target - count} to go</div>
+              </div>
+              <div style={{width:'100%',height:'3px',background:'rgba(232,165,152,0.15)',position:'relative' as const}}>
+                <div style={{position:'absolute' as const,left:0,top:0,height:'100%',width:`${progress * 100}%`,background:'#E8A598',transition:'width 0.5s ease'}} />
+              </div>
+            </>
+          )}
+          <button onClick={() => { setShowGoalSetter(true); setGoalInput(String(target)) }}
+            style={{fontSize:'0.62rem',color:'#8A847C',background:'none',border:'none',cursor:'pointer',textAlign:'left' as const,padding:0}}>
+            Edit goal
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -765,6 +956,9 @@ function Settings({ profile, partnerName, yesCount, currentStreak, longestStreak
   const [notifHour, setNotifHour] = useState(profile?.custom_notif_hour ?? 17)
   const [hourSaved, setHourSaved] = useState(false)
   const isPremium = profile?.is_premium
+  const inTrial = isInTrial(coupleMeta?.trial_started_at)
+  const hasAccess = isPremium || inTrial
+  const trialDaysLeft = daysLeftInTrial(coupleMeta?.trial_started_at)
 
   return (
     <div className={styles.screen}><div className={styles.screenInner}>

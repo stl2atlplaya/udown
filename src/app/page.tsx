@@ -173,7 +173,7 @@ export default function App() {
         const { data: pp } = await supabase.from('profiles').select('name').eq('id', pid).single()
         setPartnerName(pp?.name || 'your partner')
         const today = new Date().toISOString().split('T')[0]
-        if (couple.last_match === today) setMatched(true)
+        if (couple?.last_match === today) setMatched(true)
         setCoupleMeta(couple)
         const [myRes, partnerRes] = await Promise.all([
           supabase.from('daily_responses').select('date,response,mood').eq('couple_id', data.couple_id).eq('user_id', userId),
@@ -189,7 +189,7 @@ export default function App() {
         const todayMyResp = (myRes.data || []).find((r: any) => r.date === today)
         const todayPartnerResp = (partnerRes.data || []).find((r: any) => r.date === today)
         if (todayMyResp) { setTodayResponse(todayMyResp.response as 'yes' | 'no'); setTodayMood(todayMyResp.mood) }
-        if (todayPartnerResp?.mood && couple.last_match === today) setPartnerMood(todayPartnerResp.mood)
+       if (todayPartnerResp?.mood && couple?.last_match === today) setPartnerMood(todayPartnerResp.mood)
         // Load premium data
         if (data.is_premium) {
           const res = await fetch(`/api/premium?coupleId=${data.couple_id}&userId=${userId}`)

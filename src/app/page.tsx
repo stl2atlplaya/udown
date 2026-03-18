@@ -249,7 +249,7 @@ export default function App() {
   if (screen === 'forgot-password') return <ForgotPassword onBack={() => setScreen('login')} />
   if (screen === 'couple-setup') return <CoupleSetup userId={user?.id || ''} generatedCode={generatedCode} setGeneratedCode={setGeneratedCode} inviteCode={inviteCode} setInviteCode={setInviteCode} coupleStatus={coupleStatus} setCoupleStatus={setCoupleStatus} onLinked={() => loadProfile(user!.id)} />
   if (screen === 'upgrade') return <Upgrade profile={profile} onUpgrade={handleUpgrade} onBack={() => setScreen('home')} />
-  if (screen === 'settings') return <Settings profile={profile} partnerName={partnerName} yesCount={yesCount} currentStreak={currentStreak} longestStreak={longestStreak} coupleId={coupleId} premiumData={premiumData} onUpgrade={() => setScreen('upgrade')} onRemovePartner={handleRemovePartner} onBack={() => setScreen('home')} onSaveNotifHour={async (h) => { await fetch('/api/premium', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set-notif-hour', userId: user?.id, hour: h }) }); setProfile(p => p ? { ...p, custom_notif_hour: h } : p) }} onSignOut={async () => { await supabase.auth.signOut(); setScreen('landing'); setProfile(null); setTodayResponse(null); setMatched(false) }} />
+  if (screen === 'settings') return <Settings profile={profile} partnerName={partnerName} yesCount={yesCount} coupleMeta={coupleMeta} currentStreak={currentStreak} longestStreak={longestStreak} coupleId={coupleId} premiumData={premiumData} onUpgrade={() => setScreen('upgrade')} onRemovePartner={handleRemovePartner} onBack={() => setScreen('home')} onSaveNotifHour={async (h) => { await fetch('/api/premium', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set-notif-hour', userId: user?.id, hour: h }) }); setProfile(p => p ? { ...p, custom_notif_hour: h } : p) }} onSignOut={async () => { await supabase.auth.signOut(); setScreen('landing'); setProfile(null); setTodayResponse(null); setMatched(false) }} />
   if (screen === 'home') return (
     <Home
       profile={profile} partnerName={partnerName} todayResponse={todayResponse} todayMood={todayMood}
@@ -953,7 +953,7 @@ function MatchCalendar({ history }: { history: any[] }) {
   )
 }
 
-function Settings({ profile, partnerName, yesCount, currentStreak, longestStreak, coupleId, premiumData, onUpgrade, onRemovePartner, onBack, onSaveNotifHour, onSignOut }: any) {
+function Settings({ profile, partnerName, yesCount, currentStreak, longestStreak, coupleId, premiumData, onUpgrade, onRemovePartner, onBack, onSaveNotifHour, coupleMeta, onSignOut }: any) {
   const [notifHour, setNotifHour] = useState(profile?.custom_notif_hour ?? 17)
   const [hourSaved, setHourSaved] = useState(false)
   const isPremium = profile?.is_premium

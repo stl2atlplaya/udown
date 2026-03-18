@@ -199,6 +199,12 @@ export default function App() {
           setPremiumData(pd)
         }
       }
+      // Set trial start on first match
+      const today2 = new Date().toISOString().split('T')[0]
+      if (couple?.last_match === today2 && !couple?.trial_started_at) {
+        await supabase.from('couples').update({ trial_started_at: new Date().toISOString() }).eq('id', data.couple_id)
+      }
+
       // Load spark and goal
       const [sparkRes, goalRes] = await Promise.all([
         fetch(`/api/spark?coupleId=${data.couple_id}&userId=${userId}`),
@@ -209,9 +215,6 @@ export default function App() {
       setGoalData(goalJson)
 
       // Set trial start on first match
-      if (couple.last_match === today && !couple.trial_started_at) {
-        await supabase.from('couples').update({ trial_started_at: new Date().toISOString() }).eq('id', data.couple_id)
-      }
 
       enablePush(userId)
       setCoupleStatus('linked')

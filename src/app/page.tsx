@@ -820,7 +820,6 @@ function SparkSection({ sparkData, coupleId, userId, partnerName, sparkReflectio
               </div>
             </div>
 
-          /* I answered, waiting on partner */
           ) : myAnswer ? (
             <div style={{borderTop:'1px solid rgba(232,165,152,0.1)',paddingTop:'0.8rem',display:'flex',flexDirection:'column' as const,gap:'0.6rem'}}>
               <div>
@@ -832,7 +831,6 @@ function SparkSection({ sparkData, coupleId, userId, partnerName, sparkReflectio
               </div>
             </div>
 
-          /* Haven't answered yet */
           ) : showInput ? (
             <div style={{display:'flex',flexDirection:'column' as const,gap:'0.5rem'}}>
               <textarea value={sparkReflection} onChange={e => setSparkReflection(e.target.value)}
@@ -845,7 +843,7 @@ function SparkSection({ sparkData, coupleId, userId, partnerName, sparkReflectio
                 <button className="btn btn-ghost" style={{flex:1,padding:'0.5rem',fontSize:'0.72rem'}} onClick={() => setShowInput(false)}>Cancel</button>
               </div>
               <div style={{fontSize:'0.62rem',color:'#8A847C',textAlign:'center' as const}}>
-                {partnerAnswer ? `${partnerName || 'Your partner'} has already answered — submit yours to see theirs` : 'Your answer won't be visible until you both respond'}
+                {partnerAnswer ? `${partnerName || 'Your partner'} has already answered — submit yours to see theirs` : 'Your answer won&apos;t be visible until you both respond'}
               </div>
             </div>
           ) : (

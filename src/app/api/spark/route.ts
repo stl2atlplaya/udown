@@ -1,19 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import webpush from 'web-push'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-webpush.setVapidDetails(
-  'mailto:' + process.env.VAPID_EMAIL!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-)
-
-// Curated spark prompts — enough for a year of weekly prompts
 const SPARK_PROMPTS = [
   "What's something you've always wanted to try together but never brought up?",
   "Describe your perfect evening in three words. Compare answers.",
@@ -66,7 +58,6 @@ const SPARK_PROMPTS = [
   "What's one habit you'd love to build as a couple?",
   "What does your partner do that you never want them to stop?",
   "What would tonight look like if everything went exactly right?",
-  "What's something you want to be braver about — with your partner?",
 ]
 
 function getWeekKey(date = new Date()): string {
@@ -79,7 +70,6 @@ function getWeekKey(date = new Date()): string {
 }
 
 function getPromptForWeek(weekKey: string): string {
-  // Deterministic prompt based on week key
   const hash = weekKey.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
   return SPARK_PROMPTS[hash % SPARK_PROMPTS.length]
 }
@@ -87,34 +77,70 @@ function getPromptForWeek(weekKey: string): string {
 export async function GET(req: NextRequest) {
   const coupleId = req.nextUrl.searchParams.get('coupleId')
   const userId = req.nextUrl.searchParams.get('userId')
-  if (!coupleId) return NextResponse.json({ error: 'Missing coupleId' }, { status: 400 })
+  if (!coupleId || !userId) return NextResponse.json({ error: 'Missing params' }, { status: 400 })
 
   const weekKey = getWeekKey()
   const prompt = getPromptForWeek(weekKey)
 
-  // Get my reflection if any
-  const { data: myResponse } = await supabase
-    .from('spark_responses')
-    .select('reflection')
-    .eq('couple_id', coupleId)
-    .eq('user_id', userId)
-    .eq('week_key', weekKey)
-    .single()
+  // Get couple to find partner
+  const { data: couple } = await supabase
+    .from('couples').select('user1_id, user2_id').eq('id', coupleId).single()
 
-  return NextResponse.json({ weekKey, prompt, myReflection: myResponse?.reflection || null })
+  const partnerId = couple ? (couple.user1_id === userId ? couple.user2_id : couple.user1_id) : null
+
+  // Get both responses
+  const { data: responses } = await supabase
+    .from('spark_responses')
+    .select('user_id, reflection')
+    .eq('couple_id', coupleId)
+    .eq('week_key', weekKey)
+
+  const myResponse = responses?.find((r: any) => r.user_id === userId)
+  const partnerResponse = responses?.find((r: any) => r.user_id === partnerId)
+
+  // Only reveal partner's answer if both have answered
+  const bothAnswered = !!myResponse && !!partnerResponse
+
+  return NextResponse.json({
+    weekKey,
+    prompt,
+    myReflection: myResponse?.reflection || null,
+    partnerReflection: bothAnswered ? partnerResponse?.reflection : null,
+    partnerAnswered: !!partnerResponse,
+  })
 }
 
 export async function POST(req: NextRequest) {
   const { action, coupleId, userId, reflection } = await req.json()
 
   if (action === 'save-reflection') {
+    const weekKey = getWeekKey()
+
     await supabase.from('spark_responses').upsert({
       couple_id: coupleId,
       user_id: userId,
-      week_key: getWeekKey(),
+      week_key: weekKey,
       reflection,
     }, { onConflict: 'couple_id,user_id,week_key' })
-    return NextResponse.json({ success: true })
+
+    // Check if partner has answered — if so return their answer
+    const { data: couple } = await supabase
+      .from('couples').select('user1_id, user2_id').eq('id', coupleId).single()
+
+    const partnerId = couple ? (couple.user1_id === userId ? couple.user2_id : couple.user1_id) : null
+
+    const { data: partnerResponse } = partnerId ? await supabase
+      .from('spark_responses')
+      .select('reflection')
+      .eq('couple_id', coupleId)
+      .eq('user_id', partnerId)
+      .eq('week_key', weekKey)
+      .single() : { data: null }
+
+    return NextResponse.json({
+      success: true,
+      partnerReflection: partnerResponse?.reflection || null,
+    })
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })

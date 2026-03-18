@@ -706,7 +706,7 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
               hasAccess={hasAccess} onUpgrade={onUpgrade} trialDaysLeft={trialDaysLeft} />
 
             {/* The Spark */}
-            <SparkSection sparkData={sparkData} coupleId={coupleId} userId={userId}
+            <SparkSection sparkData={sparkData} coupleId={coupleId} userId={userId} partnerName={partnerName}
               sparkReflection={sparkReflection} setSparkReflection={setSparkReflection}
               sparkSaved={sparkSaved} setSparkSaved={setSparkSaved}
               hasAccess={hasAccess} onUpgrade={onUpgrade} trialDaysLeft={trialDaysLeft} />
@@ -766,19 +766,27 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
 }
 
 
-function SparkSection({ sparkData, coupleId, userId, sparkReflection, setSparkReflection, sparkSaved, setSparkSaved, hasAccess, onUpgrade, trialDaysLeft }: any) {
+function SparkSection({ sparkData, coupleId, userId, partnerName, sparkReflection, setSparkReflection, sparkSaved, setSparkSaved, hasAccess, onUpgrade, trialDaysLeft }: any) {
   const [saving, setSaving] = useState(false)
   const [showInput, setShowInput] = useState(false)
+  const [localSparkData, setLocalSparkData] = useState(sparkData)
 
-  if (!sparkData?.prompt) return null
+  if (!localSparkData?.prompt) return null
 
-  const saveReflection = async () => {
+  const myAnswer = localSparkData.myReflection || (sparkSaved ? sparkReflection : null)
+  const partnerAnswer = localSparkData.partnerReflection
+  const bothAnswered = myAnswer && partnerAnswer
+
+  const saveAnswer = async () => {
+    if (!sparkReflection.trim()) return
     setSaving(true)
-    await fetch('/api/spark', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    const res = await fetch('/api/spark', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'save-reflection', coupleId, userId, reflection: sparkReflection }) })
+    const data = await res.json()
     setSaving(false)
     setSparkSaved(true)
     setShowInput(false)
+    setLocalSparkData((prev: any) => ({ ...prev, myReflection: sparkReflection, partnerReflection: data.partnerReflection || null }))
   }
 
   return (
@@ -795,27 +803,54 @@ function SparkSection({ sparkData, coupleId, userId, sparkReflection, setSparkRe
         </div>
       ) : (
         <>
-          <p style={{fontSize:'0.82rem',color:'#F5F0E8',lineHeight:1.7,fontStyle:'italic'}}>&ldquo;{sparkData.prompt}&rdquo;</p>
+          <p style={{fontSize:'0.82rem',color:'#F5F0E8',lineHeight:1.7,fontStyle:'italic'}}>&ldquo;{localSparkData.prompt}&rdquo;</p>
 
-          {sparkSaved || sparkData.myReflection ? (
-            <div style={{fontSize:'0.72rem',color:'#8A847C',borderTop:'1px solid rgba(232,165,152,0.1)',paddingTop:'0.6rem'}}>
-              Your reflection saved ✓
+          {/* Both answered — show side by side reveal */}
+          {bothAnswered ? (
+            <div style={{display:'flex',flexDirection:'column' as const,gap:'0.8rem',borderTop:'1px solid rgba(232,165,152,0.1)',paddingTop:'0.8rem'}}>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.8rem'}}>
+                <div>
+                  <div style={{fontSize:'0.55rem',letterSpacing:'0.1em',textTransform:'uppercase' as const,color:'#E8A598',marginBottom:'0.4rem'}}>You</div>
+                  <div style={{fontSize:'0.75rem',color:'#F5F0E8',lineHeight:1.6,background:'rgba(232,165,152,0.05)',padding:'0.7rem',border:'1px solid rgba(232,165,152,0.12)'}}>{myAnswer}</div>
+                </div>
+                <div>
+                  <div style={{fontSize:'0.55rem',letterSpacing:'0.1em',textTransform:'uppercase' as const,color:'#8A847C',marginBottom:'0.4rem'}}>{partnerName || 'Them'}</div>
+                  <div style={{fontSize:'0.75rem',color:'#F5F0E8',lineHeight:1.6,background:'rgba(138,132,124,0.05)',padding:'0.7rem',border:'1px solid rgba(138,132,124,0.12)'}}>{partnerAnswer}</div>
+                </div>
+              </div>
             </div>
+
+          /* I answered, waiting on partner */
+          ) : myAnswer ? (
+            <div style={{borderTop:'1px solid rgba(232,165,152,0.1)',paddingTop:'0.8rem',display:'flex',flexDirection:'column' as const,gap:'0.6rem'}}>
+              <div>
+                <div style={{fontSize:'0.55rem',letterSpacing:'0.1em',textTransform:'uppercase' as const,color:'#E8A598',marginBottom:'0.4rem'}}>Your answer</div>
+                <div style={{fontSize:'0.75rem',color:'#F5F0E8',lineHeight:1.6,background:'rgba(232,165,152,0.05)',padding:'0.7rem',border:'1px solid rgba(232,165,152,0.12)'}}>{myAnswer}</div>
+              </div>
+              <div style={{fontSize:'0.68rem',color:'#8A847C',textAlign:'center' as const}}>
+                Waiting on {partnerName || 'your partner'} to answer — their response will appear here ✦
+              </div>
+            </div>
+
+          /* Haven't answered yet */
           ) : showInput ? (
             <div style={{display:'flex',flexDirection:'column' as const,gap:'0.5rem'}}>
               <textarea value={sparkReflection} onChange={e => setSparkReflection(e.target.value)}
-                placeholder="Your thoughts (private)..."
-                style={{width:'100%',background:'rgba(245,240,232,0.05)',border:'1px solid rgba(232,165,152,0.2)',color:'#F5F0E8',padding:'0.8rem',fontSize:'0.75rem',resize:'none' as const,height:'80px',boxSizing:'border-box' as const,fontFamily:'inherit'}} />
+                placeholder="Your answer..."
+                style={{width:'100%',background:'rgba(245,240,232,0.05)',border:'1px solid rgba(232,165,152,0.2)',color:'#F5F0E8',padding:'0.8rem',fontSize:'0.75rem',resize:'none' as const,height:'100px',boxSizing:'border-box' as const,fontFamily:'inherit'}} />
               <div style={{display:'flex',gap:'0.5rem'}}>
-                <button className="btn btn-yes" style={{flex:1,padding:'0.5rem',fontSize:'0.72rem'}} onClick={saveReflection} disabled={saving || !sparkReflection}>
-                  {saving ? '...' : 'Save'}
+                <button className="btn btn-yes" style={{flex:1,padding:'0.5rem',fontSize:'0.72rem'}} onClick={saveAnswer} disabled={saving || !sparkReflection.trim()}>
+                  {saving ? '...' : 'Submit ✦'}
                 </button>
                 <button className="btn btn-ghost" style={{flex:1,padding:'0.5rem',fontSize:'0.72rem'}} onClick={() => setShowInput(false)}>Cancel</button>
               </div>
+              <div style={{fontSize:'0.62rem',color:'#8A847C',textAlign:'center' as const}}>
+                {partnerAnswer ? `${partnerName || 'Your partner'} has already answered — submit yours to see theirs` : 'Your answer won't be visible until you both respond'}
+              </div>
             </div>
           ) : (
-            <button className="btn btn-ghost" style={{fontSize:'0.72rem',padding:'0.5rem'}} onClick={() => setShowInput(true)}>
-              📝 Add your reflection
+            <button className="btn btn-ghost" style={{fontSize:'0.75rem',padding:'0.6rem'}} onClick={() => setShowInput(true)}>
+              Answer this week&apos;s prompt ✦
             </button>
           )}
         </>

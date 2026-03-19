@@ -443,7 +443,8 @@ function Upgrade({ profile, onUpgrade, onBack }: { profile: Profile | null; onUp
       <p style={{color:'#8A847C',fontSize:'0.8rem',lineHeight:1.7,marginBottom:'2rem'}}>Everything you need to stay connected — and then some.</p>
       <div style={{display:'flex',flexDirection:'column',gap:'0.7rem',marginBottom:'2rem'}}>
         {[
-          ['🌙','Set your mood','Tell your partner the vibe — only if you both match'],
+          ['✦','Couples goal','Set a shared monthly target and track it together'],
+          ['✦','This week's spark','Weekly intimacy prompts — both answer, then reveal'],
           ['📅','Match history','See your connection over time with a private calendar'],
           ['⭐','Rate positions','Track what you loved, tried, and want to try next'],
           ['🛡','Streak protection','One grace day per month to protect your streak'],
@@ -452,7 +453,7 @@ function Upgrade({ profile, onUpgrade, onBack }: { profile: Profile | null; onUp
           ['⏰','Custom timing','Set your own daily prompt window'],
         ].map(([icon, title, desc]) => (
           <div key={title as string} style={{display:'flex',gap:'0.8rem',alignItems:'flex-start'}}>
-            <span style={{fontSize:'1rem',marginTop:'0.1rem'}}>{icon}</span>
+            <span style={{fontSize:'1rem',marginTop:'0.1rem',color:icon === '✦' ? '#E8A598' : 'inherit'}}>{icon}</span>
             <div><div style={{fontSize:'0.8rem',color:'#F5F0E8',marginBottom:'0.1rem'}}>{title}</div><div style={{fontSize:'0.7rem',color:'#8A847C',lineHeight:1.5}}>{desc}</div></div>
           </div>
         ))}
@@ -718,13 +719,13 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
             <CouplesGoal goalData={goalData} yesCount={yesCount} coupleId={coupleId} userId={userId}
               showGoalSetter={showGoalSetter} setShowGoalSetter={setShowGoalSetter}
               goalInput={goalInput} setGoalInput={setGoalInput} setGoalData={setGoalData}
-              hasAccess={hasAccess} onUpgrade={onUpgrade} trialDaysLeft={trialDaysLeft} />
+              hasAccess={isPremium} onUpgrade={onUpgrade} trialDaysLeft={0} />
 
             {/* The Spark */}
             <SparkSection sparkData={sparkData} coupleId={coupleId} userId={userId} partnerName={partnerName}
               sparkReflection={sparkReflection} setSparkReflection={setSparkReflection}
               sparkSaved={sparkSaved} setSparkSaved={setSparkSaved}
-              hasAccess={hasAccess} onUpgrade={onUpgrade} trialDaysLeft={trialDaysLeft} />
+              hasAccess={isPremium} onUpgrade={onUpgrade} trialDaysLeft={0} />
 
             {isPremium && premiumData?.notes?.length > 0 && (
               <div style={{marginTop:'1rem',width:'100%',maxWidth:'340px'}}>
@@ -749,8 +750,7 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
             <h2 className={`${styles.promptQuestion} serif`}>u down<br /><em>tonight?</em></h2>
             <p className={styles.promptSub}>{partnerName} won't know what you said.<br />Unless you both say yes.</p>
 
-            {isPremium && (
-              <div style={{marginBottom:'1.5rem',width:'100%',maxWidth:'300px'}}>
+            <div style={{marginBottom:'1.5rem',width:'100%',maxWidth:'300px'}}>
                 <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginBottom:'0.6rem',textAlign:'center'}}>Set the vibe — select all that apply</div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.5rem'}}>
                   {MOODS.map(m => {
@@ -765,7 +765,6 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
                   })}
                 </div>
               </div>
-            )}
 
             <div className={styles.responseButtons}>
               <button className="btn btn-yes" onClick={() => respond('yes')} disabled={loading}>Yeah 👀</button>
@@ -773,7 +772,7 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
             </div>
 
             {!isPremium && (
-              <button onClick={onUpgrade} style={{marginTop:'1.5rem',fontSize:'0.7rem',color:'#8A847C',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>Unlock uDown Plus features</button>
+              <button onClick={onUpgrade} style={{marginTop:'1.5rem',fontSize:'0.7rem',color:'#E8A598',background:'none',border:'1px solid rgba(232,165,152,0.2)',padding:'0.5rem 1.2rem',cursor:'pointer',letterSpacing:'0.06em'}}>✦ See what Plus unlocks</button>
             )}
           </div>
         )}

@@ -76,6 +76,13 @@ function storeUserIdForSW(userId: string) {
 }
 
 
+function getEstToday(): string | null {
+  const now = new Date()
+  const estHour = parseInt(now.toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false }))
+  if (estHour < 6) return null // Before 6am EST — still "yesterday"
+  return now.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) // YYYY-MM-DD
+}
+
 function isInTrial(trialStartedAt: string | null): boolean {
   if (!trialStartedAt) return false
   const trialEnd = new Date(trialStartedAt)
@@ -188,8 +195,8 @@ export default function App() {
         const streaks = calculateStreaks(myYes.map((r: any) => r.date), partnerYes.map((r: any) => r.date))
         setCurrentStreak(streaks.current)
         setLongestStreak(streaks.longest)
-        const todayMyResp = (myRes.data || []).find((r: any) => r.date === today)
-        const todayPartnerResp = (partnerRes.data || []).find((r: any) => r.date === today)
+        const todayMyResp = estToday ? (myRes.data || []).find((r: any) => r.date === estToday) : null
+        const todayPartnerResp = estToday ? (partnerRes.data || []).find((r: any) => r.date === estToday) : null
         if (todayMyResp) { setTodayResponse(todayMyResp.response as 'yes' | 'no'); setTodayMood(todayMyResp.mood) }
         if (todayPartnerResp?.mood && couple.last_match === today) setPartnerMood(todayPartnerResp.mood)
         // Load premium data
@@ -200,8 +207,8 @@ export default function App() {
         }
       }
       // Set trial start on first match
-      const today2 = new Date().toISOString().split('T')[0]
-      if (couple?.last_match === today2 && !couple?.trial_started_at) {
+      const today2 = getEstToday()
+      if (today2 && couple?.last_match === today2 && !couple?.trial_started_at) {
         await supabase.from('couples').update({ trial_started_at: new Date().toISOString() }).eq('id', data.couple_id)
       }
 
@@ -463,7 +470,7 @@ function Upgrade({ profile, onUpgrade, onBack }: { profile: Profile | null; onUp
 
 function Home({ profile, partnerName, todayResponse, todayMood, matched, partnerMood, yesCount, currentStreak, longestStreak, premiumData, coupleId, userId, coupleMeta, sparkData, goalData, setGoalData, onRespond, onRatePosition, onSaveNote, onUpgrade, onSettings, onSignOut }: any) {
   const [loading, setLoading] = useState(false)
-  const [selectedMood, setSelectedMood] = useState<string | null>(null)
+  const [selectedMoods, setSelectedMoods] = useState<string[]>([])
   const [showMoodPicker, setShowMoodPicker] = useState(false)
   const [showNoteInput, setShowNoteInput] = useState(false)
   const [note, setNote] = useState('')
@@ -489,7 +496,7 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
 
   const respond = async (r: 'yes' | 'no') => {
     setLoading(true)
-    await onRespond(r, selectedMood)
+    await onRespond(r, selectedMoods.length > 0 ? selectedMoods : null)
     setLoading(false)
   }
 
@@ -520,8 +527,13 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
     setSuggestedTime('')
   }
 
-  const matchedMoodLabel = MOODS.find(m => m.key === partnerMood)?.label
-  const myMoodLabel = MOODS.find(m => m.key === todayMood)?.label
+  const myMoods: string[] = Array.isArray(todayMood) ? todayMood : (todayMood ? [todayMood] : [])
+  const partnerMoods: string[] = Array.isArray(partnerMood) ? partnerMood : (partnerMood ? [partnerMood] : [])
+  const sharedMoods = myMoods.filter(m => partnerMoods.includes(m))
+  const myMoodLabel = myMoods.map(k => MOODS.find(m => m.key === k)?.label).filter(Boolean).join(' · ')
+  const matchedMoodLabel = sharedMoods.length > 0
+    ? sharedMoods.map(k => MOODS.find(m => m.key === k)?.label).filter(Boolean).join(' · ')
+    : partnerMoods.map(k => MOODS.find(m => m.key === k)?.label).filter(Boolean).join(' · ')
 
   const milestoneMsg = yesCount === 10 ? "✦ Ten nights together." : yesCount === 25 ? "✦ Twenty-five. That's something." : yesCount === 50 ? "✦ Fifty nights. Remarkable." : yesCount === 100 ? "✦ One hundred. Legendary." : null
 
@@ -570,8 +582,10 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
               <div style={{fontSize:'2.5rem',animation:'pulse 2s ease-in-out infinite',marginBottom:'0.8rem'}}>✦</div>
               <h2 className={`${styles.matchTitle} serif`} style={{marginBottom:'0.4rem'}}>You're both down.</h2>
               <p style={{fontSize:'0.8rem',color:'#8A847C',lineHeight:1.7}}>
-                {matchedMoodLabel && myMoodLabel
-                  ? `You're feeling ${myMoodLabel.split(' ').slice(1).join(' ').toLowerCase()}. They're feeling ${matchedMoodLabel.split(' ').slice(1).join(' ').toLowerCase()}.`
+                {sharedMoods.length > 0
+                  ? `You're both feeling ${sharedMoods.map(k => MOODS.find(m => m.key === k)?.label?.split(' ').slice(1).join(' ').toLowerCase()).join(' and ')}.`
+                  : myMoodLabel && matchedMoodLabel
+                  ? `You: ${myMoodLabel} · Them: ${matchedMoodLabel}`
                   : "Tonight's the night."}
               </p>
             </div>
@@ -736,15 +750,18 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
 
             {isPremium && (
               <div style={{marginBottom:'1.5rem',width:'100%',maxWidth:'300px'}}>
-                <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginBottom:'0.6rem',textAlign:'center'}}>Set the vibe (optional)</div>
+                <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginBottom:'0.6rem',textAlign:'center'}}>Set the vibe — select all that apply</div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.5rem'}}>
-                  {MOODS.map(m => (
-                    <button key={m.key} onClick={() => setSelectedMood(selectedMood === m.key ? null : m.key)}
-                      style={{padding:'0.6rem',border:`1px solid ${selectedMood === m.key ? '#E8A598' : 'rgba(232,165,152,0.15)'}`,background:selectedMood === m.key ? 'rgba(232,165,152,0.1)' : 'none',color:selectedMood === m.key ? '#E8A598' : '#8A847C',fontSize:'0.7rem',cursor:'pointer',textAlign:'left' as const}}>
+                  {MOODS.map(m => {
+                    const selected = selectedMoods.includes(m.key)
+                    return (
+                    <button key={m.key} onClick={() => setSelectedMoods(prev => selected ? prev.filter(k => k !== m.key) : [...prev, m.key])}
+                      style={{padding:'0.6rem',border:`1px solid ${selected ? '#E8A598' : 'rgba(232,165,152,0.15)'}`,background:selected ? 'rgba(232,165,152,0.1)' : 'none',color:selected ? '#E8A598' : '#8A847C',fontSize:'0.7rem',cursor:'pointer',textAlign:'left' as const}}>
                       <div>{m.label}</div>
                       <div style={{fontSize:'0.6rem',opacity:0.7,marginTop:'0.1rem'}}>{m.desc}</div>
                     </button>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}

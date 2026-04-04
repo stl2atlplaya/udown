@@ -191,8 +191,7 @@ export default function App() {
         const partnerYes = (partnerRes.data || []).filter((r: any) => r.response === 'yes')
         const mySet = new Set(myYes.map((r: any) => r.date))
         const mutualMatches = partnerYes.filter((r: any) => mySet.has(r.date))
-        console.log('yesCount debug:', { myYesDates: myYes.map((r:any)=>r.date), partnerYesDates: partnerYes.map((r:any)=>r.date), mutual: mutualMatches.length })
-        setYesCount(mutualMatches.length)
+setYesCount(mutualMatches.length)
         const streaks = calculateStreaks(myYes.map((r: any) => r.date), partnerYes.map((r: any) => r.date))
         setCurrentStreak(streaks.current)
         setLongestStreak(streaks.longest)
@@ -550,8 +549,7 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
           else { tapTimer.current = setTimeout(() => setTapCount(0), 2000) }
         }}>u<em>Down</em></div>
         <div className={styles.homeHeaderRight}>
-          {yesCount > 0 && <div className={styles.yesCounter} title="Times you've both said yes">✦ {yesCount}</div>}
-          {!isPremium && <button onClick={onUpgrade} style={{fontSize:'0.6rem',letterSpacing:'0.08em',color:'#E8A598',background:'none',border:'1px solid rgba(232,165,152,0.3)',padding:'0.2rem 0.5rem',cursor:'pointer',textTransform:'uppercase'}}>Plus</button>}
+{!isPremium && <button onClick={onUpgrade} style={{fontSize:'0.6rem',letterSpacing:'0.08em',color:'#E8A598',background:'none',border:'1px solid rgba(232,165,152,0.3)',padding:'0.2rem 0.5rem',cursor:'pointer',textTransform:'uppercase'}}>Plus</button>}
           <button className={styles.settingsBtn} onClick={onSettings}>⚙</button>
           <button className={styles.signOut} onClick={onSignOut}>sign out</button>
         </div>
@@ -709,11 +707,7 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
             <p className={styles.respondedSub}>{todayResponse === 'yes' ? `Waiting on ${partnerName}. If they're down too, you'll both know.` : "We'll check in again tomorrow."}</p>
             <div className={styles.responseTag}>You said <span className={todayResponse === 'yes' ? styles.tagYes : styles.tagNo}>{todayResponse === 'yes' ? 'yes' : 'no'}</span> today{myMoodLabel ? ` · ${myMoodLabel}` : ''}</div>
 
-            {isPremium && premiumData?.history?.length > 0 && (
-              <MatchCalendar history={premiumData.history} />
-            )}
-
-            <Dashboard yesCount={yesCount} currentStreak={currentStreak} longestStreak={longestStreak} />
+<Dashboard yesCount={yesCount} currentStreak={currentStreak} longestStreak={longestStreak} />
 
             {/* Couples Goal */}
             <CouplesGoal goalData={goalData} yesCount={yesCount} coupleId={coupleId} userId={userId}
@@ -884,8 +878,7 @@ function CouplesGoal({ goalData, yesCount, coupleId, userId, showGoalSetter, set
       const res = await fetch('/api/goal', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ coupleId, userId, target: Number(goalInput) }) })
       const data = await res.json()
-      console.log('goal save result:', data, 'coupleId:', coupleId, 'target:', goalInput)
-      if (data.success) {
+if (data.success) {
         setGoalData({ goalTarget: Number(goalInput), matchCount: goalData?.matchCount || 0, goalMonth: goalData?.goalMonth })
         setShowGoalSetter(false)
       }

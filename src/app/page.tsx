@@ -889,7 +889,7 @@ if (data.success) {
   }
 
   const target = goalData?.goalTarget
-  const count = yesCount || 0
+  const count = goalData?.matchCount || 0
   const progress = target ? Math.min(count / target, 1) : 0
   const achieved = target && count >= target
   const currentMonth = new Date().toLocaleString('default', { month: 'long' })

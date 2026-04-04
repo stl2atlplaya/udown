@@ -10,7 +10,10 @@ export async function GET(req: NextRequest) {
   const coupleId = req.nextUrl.searchParams.get('coupleId')
   if (!coupleId) return NextResponse.json({ error: 'Missing coupleId' }, { status: 400 })
 
-  const currentMonth = new Date().toISOString().slice(0, 7) // "2026-03"
+  const now = new Date()
+  const currentMonth = now.toISOString().slice(0, 7) // "2026-04"
+  const monthStart = `${currentMonth}-01`
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
 
   const { data: couple } = await supabase
     .from('couples')
@@ -20,21 +23,21 @@ export async function GET(req: NextRequest) {
 
   if (!couple) return NextResponse.json({ error: 'Couple not found' }, { status: 404 })
 
-  // Count matches this month
+  // Count mutual matches THIS MONTH ONLY
   const { data: responses } = await supabase
     .from('daily_responses')
     .select('date, user_id, response')
     .eq('couple_id', coupleId)
-    .gte('date', `${currentMonth}-01`)
+    .gte('date', monthStart)
+    .lte('date', monthEnd)
     .eq('response', 'yes')
 
-  // Count days where both said yes
   const dateMap: Record<string, Set<string>> = {}
   for (const r of responses || []) {
     if (!dateMap[r.date]) dateMap[r.date] = new Set()
     dateMap[r.date].add(r.user_id)
   }
-  const matchCount = Object.values(dateMap).filter(users =>
+  const monthMatchCount = Object.values(dateMap).filter(users =>
     users.has(couple.user1_id) && users.has(couple.user2_id)
   ).length
 
@@ -44,7 +47,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     goalTarget: activeGoal,
     goalMonth: currentMonth,
-    matchCount,
+    matchCount: monthMatchCount,
     isNewMonth: couple.goal_month !== currentMonth,
   })
 }

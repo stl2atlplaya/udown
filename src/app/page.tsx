@@ -443,7 +443,7 @@ function Upgrade({ profile, onUpgrade, onBack }: { profile: Profile | null; onUp
       <div style={{display:'flex',flexDirection:'column',gap:'0.7rem',marginBottom:'2rem'}}>
         {[
           ['✦','Couples goal','Set a shared monthly target and track it together'],
-          ['✦','This week's spark','Weekly intimacy prompts — both answer, then reveal'],
+          ['✦','This week\'s spark','Weekly intimacy prompts — both answer, then reveal'],
           ['📅','Match history','See your connection over time with a private calendar'],
           ['⭐','Rate positions','Track what you loved, tried, and want to try next'],
           ['🛡','Streak protection','One grace day per month to protect your streak'],

@@ -14,23 +14,19 @@ webpush.setVapidDetails(
 )
 
 const MESSAGES = [
-  { title: "Hey you.", body: "Big plans tonight? No pressure. Just wondering. u down? 🌙" },
-  { title: "Quick question.", body: "The couch will still be there. But so will tonight. u down?" },
-  { title: "Asking for a friend.", body: "That friend is your relationship. u down tonight? 🌙" },
-  { title: "No context needed.", body: "You know what this is. u down?" },
-  { title: "Evening check-in.", body: "Work's done. Day's over. What are you in the mood for? 👀" },
-  { title: "Just between us.", body: "Your partner doesn't know we're asking. u down tonight? 🌙" },
-  { title: "A thought.", body: "Netflix will still be there tomorrow. u down?" },
-  { title: "Genuine question.", body: "Is tonight a good night? We're asking. u down? 🌙" },
+  { title: "Hey there...", body: "uDown? 🌙" },
+  { title: "Checking in...", body: "uDown? 👀" },
+  { title: "So....", body: "uDown? 🌙" },
+  { title: "Just wonderin'...", body: "uDown? 👀" },
+  { title: "Is tonight the night?", body: "uDown? 🌙" },
 ]
 
 const REMINDER_MESSAGES = [
-  { title: "Still here.", body: "An hour ago you weren't sure. Are you sure now? 👀" },
-  { title: "Checking back in.", body: "No rush. But also… the night isn't getting younger. u down?" },
-  { title: "Your reminder.", body: "You asked us to ask again. So. u down tonight? 🌙" },
-  { title: "One more time.", body: "You hit snooze on this. We respect it. But now we're back. u down? 👀" },
-  { title: "Still wondering.", body: "An hour later and we're still curious. What do you say? 🌙" },
-  { title: "The nudge you asked for.", body: "This is that nudge. Don't waste it. u down?" },
+  { title: "Still here...", body: "uDown? 🌙" },
+  { title: "An hour later...", body: "uDown? 👀" },
+  { title: "Checking back in...", body: "uDown? 🌙" },
+  { title: "Still wonderin'...", body: "uDown? 👀" },
+  { title: "One more time...", body: "uDown? 🌙" },
 ]
 
 async function sendToUser(subscription: string, payload: string): Promise<'sent' | 'stale'> {

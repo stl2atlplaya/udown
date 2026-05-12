@@ -563,7 +563,7 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
         }}>u<em>Down</em></div>
         <div className={styles.homeHeaderRight}>
 {!isPremium && <button onClick={onUpgrade} style={{fontSize:'0.6rem',letterSpacing:'0.08em',color:'#E8A598',background:'none',border:'1px solid rgba(232,165,152,0.3)',padding:'0.2rem 0.5rem',cursor:'pointer',textTransform:'uppercase'}}>Plus</button>}
-          <button className={styles.settingsBtn} onClick={onSettings}>⚙</button>
+          <button className={styles.settingsBtn} onClick={onSettings} style={{fontSize:"1.3rem",padding:"0 0.3rem"}}>⚙</button>
           <button className={styles.signOut} onClick={onSignOut}>sign out</button>
         </div>
       </div>

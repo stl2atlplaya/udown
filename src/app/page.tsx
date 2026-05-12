@@ -480,6 +480,10 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
   const [signalSent, setSignalSent] = useState<'none'|'onmyway'|'time'>('none')
   const [suggestedTime, setSuggestedTime] = useState('')
   const [showTimePicker, setShowTimePicker] = useState(false)
+  const [myWord, setMyWord] = useState<string | null>(null)
+  const [partnerWord, setPartnerWord] = useState<string | null>(null)
+  const [wordInput, setWordInput] = useState('')
+  const [wordSaving, setWordSaving] = useState(false)
   const [tapCount, setTapCount] = useState(0)
   const tapTimer = useRef<any>(null)
   const [sparkReflection, setSparkReflection] = useState('')
@@ -491,6 +495,15 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
   const position = getTodayPosition()
   const isPremium = profile?.is_premium
   const inTrial = isInTrial(coupleMeta?.trial_started_at)
+
+  useEffect(() => {
+    if (matched && coupleId && userId) {
+      fetch(`/api/word?coupleId=${coupleId}&userId=${userId}`)
+        .then(r => r.json())
+        .then(d => { setMyWord(d.myWord); setPartnerWord(d.partnerWord) })
+        .catch(() => {})
+    }
+  }, [matched, coupleId, userId])
   const hasAccess = isPremium || inTrial
   const trialDaysLeft = daysLeftInTrial(coupleMeta?.trial_started_at)
   const posRating = premiumData?.ratings?.find((r: any) => r.position_name === position.name)?.rating
@@ -934,6 +947,15 @@ function Settings({ profile, partnerName, yesCount, currentStreak, longestStreak
   const [hourSaved, setHourSaved] = useState(false)
   const isPremium = profile?.is_premium
   const inTrial = isInTrial(coupleMeta?.trial_started_at)
+
+  useEffect(() => {
+    if (matched && coupleId && userId) {
+      fetch(`/api/word?coupleId=${coupleId}&userId=${userId}`)
+        .then(r => r.json())
+        .then(d => { setMyWord(d.myWord); setPartnerWord(d.partnerWord) })
+        .catch(() => {})
+    }
+  }, [matched, coupleId, userId])
   const hasAccess = isPremium || inTrial
   const trialDaysLeft = daysLeftInTrial(coupleMeta?.trial_started_at)
 

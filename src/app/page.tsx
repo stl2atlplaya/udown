@@ -945,17 +945,6 @@ function MatchCalendar({ history }: { history: any[] }) {
 function Settings({ profile, partnerName, yesCount, currentStreak, longestStreak, coupleId, premiumData, onUpgrade, onRemovePartner, onBack, onSaveNotifHour, onSignOut, coupleMeta }: any) {
   const [notifMinutes, setNotifMinutes] = useState((profile?.custom_notif_hour ?? 17) * 60)
   const [hourSaved, setHourSaved] = useState(false)
-  const isPremium = profile?.is_premium
-  const inTrial = isInTrial(coupleMeta?.trial_started_at)
-
-  useEffect(() => {
-    if (matched && coupleId && userId) {
-      fetch(`/api/word?coupleId=${coupleId}&userId=${userId}`)
-        .then(r => r.json())
-        .then(d => { setMyWord(d.myWord); setPartnerWord(d.partnerWord) })
-        .catch(() => {})
-    }
-  }, [matched, coupleId, userId])
   const hasAccess = isPremium || inTrial
   const trialDaysLeft = daysLeftInTrial(coupleMeta?.trial_started_at)
 

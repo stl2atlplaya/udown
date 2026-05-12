@@ -943,7 +943,7 @@ function MatchCalendar({ history }: { history: any[] }) {
 }
 
 function Settings({ profile, partnerName, yesCount, currentStreak, longestStreak, coupleId, premiumData, onUpgrade, onRemovePartner, onBack, onSaveNotifHour, onSignOut, coupleMeta }: any) {
-  const [notifHour, setNotifHour] = useState(profile?.custom_notif_hour ?? 17)
+  const [notifMinutes, setNotifMinutes] = useState((profile?.custom_notif_hour ?? 17) * 60)
   const [hourSaved, setHourSaved] = useState(false)
   const isPremium = profile?.is_premium
   const inTrial = isInTrial(coupleMeta?.trial_started_at)
@@ -992,10 +992,18 @@ function Settings({ profile, partnerName, yesCount, currentStreak, longestStreak
           <div className={styles.settingsLabel}>Notification time</div>
           <p style={{fontSize:'0.72rem',color:'#8A847C',marginBottom:'0.8rem'}}>Set your preferred prompt hour</p>
           <div style={{display:'flex',gap:'0.8rem',alignItems:'center'}}>
-            <input type="range" min={14} max={21} value={notifHour} onChange={e => setNotifHour(parseInt(e.target.value))} style={{flex:1}} />
-            <span style={{fontSize:'0.8rem',color:'#F5F0E8',minWidth:'45px'}}>{notifHour > 12 ? `${notifHour-12}pm` : `${notifHour}am`}</span>
+            <input type="range" min={840} max={1260} step={5} value={notifMinutes} onChange={e => setNotifMinutes(parseInt(e.target.value))} style={{flex:1}} />
+            <span style={{fontSize:'0.8rem',color:'#F5F0E8',minWidth:'55px'}}>
+              {(() => {
+                const h = Math.floor(notifMinutes / 60)
+                const m = notifMinutes % 60
+                const ampm = h >= 12 ? 'pm' : 'am'
+                const h12 = h > 12 ? h - 12 : h
+                return `${h12}:${String(m).padStart(2,'0')}${ampm}`
+              })()}
+            </span>
           </div>
-          <button className="btn btn-ghost" style={{marginTop:'0.8rem',padding:'0.6rem',fontSize:'0.72rem'}} onClick={async () => { await onSaveNotifHour(notifHour); setHourSaved(true); setTimeout(() => setHourSaved(false), 2000) }}>{hourSaved ? 'Saved ✓' : 'Save time'}</button>
+          <button className="btn btn-ghost" style={{marginTop:'0.8rem',padding:'0.6rem',fontSize:'0.72rem'}} onClick={async () => { await onSaveNotifHour(notifMinutes); setHourSaved(true); setTimeout(() => setHourSaved(false), 2000) }}>{hourSaved ? 'Saved ✓' : 'Save time'}</button>
         </div>
       )}
 

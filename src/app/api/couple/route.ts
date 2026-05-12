@@ -6,70 +6,57 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// POST /api/couple — generate or use invite code
+function generateCode(): string {
+  return Math.random().toString(36).substring(2, 8).toUpperCase()
+}
+
 export async function POST(req: NextRequest) {
   const { action, userId, inviteCode } = await req.json()
 
   if (action === 'create') {
-    // Generate a unique invite code for this user
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase()
+    // Clear any existing pending invites for this user
+    await supabase.from('invites').delete().eq('created_by', userId)
 
+    const code = generateCode()
     const { error } = await supabase.from('invites').insert({
       code,
       created_by: userId,
       expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     })
-
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ code })
   }
 
   if (action === 'join') {
-    // Look up the invite
-    const { data: invite, error: inviteError } = await supabase
-      .from('invites')
-      .select('*')
-      .eq('code', inviteCode.toUpperCase())
-      .gte('expires_at', new Date().toISOString())
-      .single()
-
-    if (inviteError || !invite) {
-      return NextResponse.json({ error: 'Invalid or expired invite code' }, { status: 400 })
-    }
-
-    if (invite.created_by === userId) {
-      return NextResponse.json({ error: "That's your own code!" }, { status: 400 })
-    }
-
     // Check neither user is already coupled
-    const { data: existingCouple } = await supabase
-      .from('couples')
-      .select('id')
-      .or(`user1_id.eq.${userId},user2_id.eq.${userId},user1_id.eq.${invite.created_by},user2_id.eq.${invite.created_by}`)
+    const { data: myProfile } = await supabase.from('profiles').select('couple_id').eq('id', userId).single()
+    if (myProfile?.couple_id) return NextResponse.json({ error: 'You are already coupled up.' }, { status: 400 })
+
+    const { data: invite } = await supabase.from('invites')
+      .select('created_by, expires_at')
+      .eq('code', inviteCode.toUpperCase())
       .single()
 
-    if (existingCouple) {
-      return NextResponse.json({ error: 'One of you is already coupled up.' }, { status: 400 })
-    }
+    if (!invite) return NextResponse.json({ error: 'Invalid code.' }, { status: 400 })
+    if (new Date(invite.expires_at) < new Date()) return NextResponse.json({ error: 'Code has expired.' }, { status: 400 })
+    if (invite.created_by === userId) return NextResponse.json({ error: "That's your own code!" }, { status: 400 })
+
+    const { data: theirProfile } = await supabase.from('profiles').select('couple_id').eq('id', invite.created_by).single()
+    if (theirProfile?.couple_id) return NextResponse.json({ error: 'Your partner is already coupled up.' }, { status: 400 })
 
     // Create couple
-    const { data: couple, error: coupleError } = await supabase
-      .from('couples')
-      .insert({
-        user1_id: invite.created_by,
-        user2_id: userId,
-      })
-      .select()
-      .single()
+    const { data: couple, error: coupleError } = await supabase.from('couples').insert({
+      user1_id: invite.created_by,
+      user2_id: userId,
+    }).select().single()
 
-    if (coupleError) return NextResponse.json({ error: coupleError.message }, { status: 400 })
+    if (coupleError || !couple) return NextResponse.json({ error: coupleError?.message || 'Failed to create couple' }, { status: 400 })
 
-    // Update profiles with couple_id
-    await supabase.from('profiles').update({ couple_id: couple.id }).eq('id', invite.created_by)
-    await supabase.from('profiles').update({ couple_id: couple.id }).eq('id', userId)
+    // Link both profiles
+    await supabase.from('profiles').update({ couple_id: couple.id }).in('id', [userId, invite.created_by])
 
-    // Delete invite
-    await supabase.from('invites').delete().eq('code', inviteCode)
+    // Clean up invite
+    await supabase.from('invites').delete().eq('code', inviteCode.toUpperCase())
 
     return NextResponse.json({ success: true, coupleId: couple.id })
   }
@@ -77,20 +64,24 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
 }
 
-// DELETE /api/couple — remove partner linkage
 export async function DELETE(req: NextRequest) {
   const { userId, coupleId } = await req.json()
 
-  // Remove couple_id from both profiles
-  const { data: couple } = await supabase
-    .from('couples').select('user1_id, user2_id').eq('id', coupleId).single()
+  if (!userId || !coupleId) return NextResponse.json({ error: 'Missing params' }, { status: 400 })
+
+  // Get both users in the couple
+  const { data: couple } = await supabase.from('couples').select('user1_id, user2_id').eq('id', coupleId).single()
 
   if (!couple) return NextResponse.json({ error: 'Couple not found' }, { status: 404 })
 
-  await supabase.from('profiles').update({ couple_id: null })
-    .in('id', [couple.user1_id, couple.user2_id])
+  // Unlink BOTH partners
+  await supabase.from('profiles').update({ couple_id: null }).in('id', [couple.user1_id, couple.user2_id])
 
+  // Delete the couple record
   await supabase.from('couples').delete().eq('id', coupleId)
+
+  // Clean up push subscription snooze
+  await supabase.from('push_subscriptions').update({ remind_at: null }).in('user_id', [couple.user1_id, couple.user2_id])
 
   return NextResponse.json({ success: true })
 }

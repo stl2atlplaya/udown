@@ -484,8 +484,6 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
   const [sparkSaved, setSparkSaved] = useState(false)
   const [showGoalSetter, setShowGoalSetter] = useState(false)
   const [goalInput, setGoalInput] = useState('')
-  const [suggestedTime, setSuggestedTime] = useState('')
-  const [showTimePicker, setShowTimePicker] = useState(false)
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Hey' : 'Good evening'
   const position = getTodayPosition()
@@ -599,99 +597,20 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
               )}
             </div>
 
-            {/* Confirmed time — show prominently if set */}
-            {coupleMeta?.confirmed_time && (
-              <div style={{width:'100%',maxWidth:'340px',marginBottom:'1.5rem',border:'1px solid rgba(232,165,152,0.4)',padding:'1.2rem',textAlign:'center' as const,background:'rgba(232,165,152,0.06)'}}>
-                <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginBottom:'0.4rem'}}>Tonight at</div>
-                <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'2rem',fontStyle:'italic',color:'#E8A598'}}>{coupleMeta.confirmed_time}</div>
-                <div style={{fontSize:'0.68rem',color:'#8A847C',marginTop:'0.4rem'}}>confirmed ✦</div>
-              </div>
-            )}
-
-            {/* Time suggestion flow */}
-            {!coupleMeta?.confirmed_time && (() => {
-              const iSuggested = coupleMeta?.suggested_time && coupleMeta?.suggested_by === userId
-              const theySuggested = coupleMeta?.suggested_time && coupleMeta?.suggested_by !== userId
-              const noSuggestion = !coupleMeta?.suggested_time
-
-              return (
-                <div style={{width:'100%',maxWidth:'340px',marginBottom:'1.5rem'}}>
-
-                  {/* I suggested — waiting on partner */}
-                  {iSuggested && !showTimePicker && (
-                    <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1.2rem',display:'flex',flexDirection:'column' as const,gap:'0.5rem',textAlign:'center' as const}}>
-                      <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C'}}>You suggested</div>
-                      <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'2rem',fontStyle:'italic',color:'#E8A598'}}>{coupleMeta.suggested_time}</div>
-                      <div style={{fontSize:'0.7rem',color:'#8A847C'}}>Awaiting your partner&apos;s response</div>
-                    </div>
-                  )}
-
-                  {/* Partner suggested — my turn to respond */}
-                  {theySuggested && !showTimePicker && (
-                    <div style={{border:'1px solid rgba(232,165,152,0.25)',padding:'1.2rem',display:'flex',flexDirection:'column' as const,gap:'0.8rem'}}>
-                      <div style={{textAlign:'center' as const}}>
-                        <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginBottom:'0.4rem'}}>They suggested</div>
-                        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:'2rem',fontStyle:'italic',color:'#E8A598'}}>{coupleMeta.suggested_time}</div>
-                      </div>
-                      <div style={{display:'flex',gap:'0.6rem'}}>
-                        <button className="btn btn-yes" style={{flex:1,padding:'0.7rem',fontSize:'0.78rem'}}
-                          onClick={() => sendSignal('approve_time')}>
-                          ✓ Works for me
-                        </button>
-                        <button className="btn btn-ghost" style={{flex:1,padding:'0.7rem',fontSize:'0.78rem'}}
-                          onClick={() => { setShowTimePicker(true); setSuggestedTime('') }}>
-                          ↩ New time
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Time picker — for initial suggestion or counter */}
-                  {showTimePicker && (
-                    <div style={{border:'1px solid rgba(232,165,152,0.2)',padding:'1rem',display:'flex',flexDirection:'column' as const,gap:'0.6rem'}}>
-                      <div style={{fontSize:'0.68rem',color:'#8A847C'}}>
-                        {theySuggested ? 'Suggest a different time' : 'What time works for you?'}
-                      </div>
-                      <input type="time" value={suggestedTime} onChange={e => setSuggestedTime(e.target.value)}
-                        style={{background:'rgba(245,240,232,0.05)',border:'1px solid rgba(232,165,152,0.2)',color:'#F5F0E8',padding:'0.6rem',fontSize:'1rem',textAlign:'center' as const,width:'100%',boxSizing:'border-box' as const}} />
-                      <div style={{display:'flex',gap:'0.5rem'}}>
-                        <button className="btn btn-yes" style={{flex:1,padding:'0.6rem',fontSize:'0.75rem'}}
-                          onClick={() => suggestedTime && sendSignal('suggest_time', suggestedTime)}
-                          disabled={!suggestedTime}>Send ✦</button>
-                        <button className="btn btn-ghost" style={{flex:1,padding:'0.6rem',fontSize:'0.75rem'}}
-                          onClick={() => setShowTimePicker(false)}>Cancel</button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* No suggestion yet — show action buttons */}
-                  {noSuggestion && !showTimePicker && (
-                    <div style={{display:'flex',flexDirection:'column' as const,gap:'0.6rem'}}>
-                      <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginBottom:'0.2rem',textAlign:'center' as const}}>Let them know</div>
-                      {signalSent === 'none' ? (
-                        <>
-                          <button className="btn btn-yes" onClick={() => sendSignal('on_my_way')}
-                            style={{width:'100%',padding:'0.9rem',fontSize:'0.82rem'}}>
-                            🌙 On my way now
-                          </button>
-                          <button className="btn btn-ghost" onClick={() => setShowTimePicker(true)}
-                            style={{width:'100%',padding:'0.9rem',fontSize:'0.82rem'}}>
-                            ⏰ Suggest a time
-                          </button>
-                        </>
-                      ) : (
-                        <div style={{textAlign:'center' as const,padding:'1rem',border:'1px solid rgba(232,165,152,0.15)'}}>
-                          <div style={{fontSize:'0.78rem',color:'#F5F0E8'}}>
-                            {signalSent === 'onmyway' ? '🌙 They know you&apos;re on your way.' : '⏰ Time sent.'}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
+{/* Let them know */}
+            <div style={{width:'100%',maxWidth:'340px',marginBottom:'1.5rem'}}>
+              <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginBottom:'0.8rem',textAlign:'center' as const}}>Let them know</div>
+              {signalSent === 'none' ? (
+                <button className="btn btn-yes" onClick={() => sendSignal('on_my_way')}
+                  style={{width:'100%',padding:'0.9rem',fontSize:'0.82rem'}}>
+                  🌙 On my way now
+                </button>
+              ) : (
+                <div style={{textAlign:'center' as const,padding:'1rem',border:'1px solid rgba(232,165,152,0.15)'}}>
+                  <div style={{fontSize:'0.78rem',color:'#F5F0E8'}}>🌙 They know you&apos;re on your way.</div>
                 </div>
-              )
-            })()}
+              )}
+            </div>
 
             {/* Match counter in header already shown, just streaks here */}
             <div style={{width:'100%',maxWidth:'340px',fontSize:'0.65rem',color:'#8A847C',textAlign:'center' as const,lineHeight:1.8}}>

@@ -945,6 +945,8 @@ function MatchCalendar({ history }: { history: any[] }) {
 function Settings({ profile, partnerName, yesCount, currentStreak, longestStreak, coupleId, premiumData, onUpgrade, onRemovePartner, onBack, onSaveNotifHour, onSignOut, coupleMeta }: any) {
   const [notifMinutes, setNotifMinutes] = useState((profile?.custom_notif_hour ?? 17) * 60)
   const [hourSaved, setHourSaved] = useState(false)
+  const isPremium = profile?.is_premium
+  const inTrial = isInTrial(coupleMeta?.trial_started_at)
   const hasAccess = isPremium || inTrial
   const trialDaysLeft = daysLeftInTrial(coupleMeta?.trial_started_at)
 

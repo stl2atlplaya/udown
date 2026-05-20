@@ -102,7 +102,11 @@ input, button { font-family: 'DM Mono', monospace; }
   display: block;
 }
 
-.serif { font-family: 'DM Serif Display', serif; }
+.serif { font-family: 'DM Serif Display', serif; font-style: italic; }
+
+h1, h2, h3 { font-family: 'DM Serif Display', serif; font-style: italic; font-weight: 400; }
+
+em { font-family: 'DM Serif Display', serif; font-style: italic; }
 
 
 @keyframes pulse {

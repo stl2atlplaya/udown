@@ -312,25 +312,131 @@ function Landing({ onLogin, onSignup }: { onLogin: () => void; onSignup: () => v
 }
 
 function Signup({ onBack, onSuccess }: { onBack: () => void; onSuccess: (u: User) => void }) {
-  const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [error, setError] = useState(''); const [loading, setLoading] = useState(false)
+  const [step, setStep] = useState(0)
+  const [goal, setGoal] = useState('')
+  const [relLength, setRelLength] = useState('')
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const progress = [12, 28, 44, 60, 76][step] || 12
+
+  const goals = [
+    { key: 'awkward', icon: '😶', label: 'Initiating feels awkward or one-sided' },
+    { key: 'reconnect', icon: '🔥', label: 'We want to reconnect and be more intentional' },
+    { key: 'communication', icon: '💬', label: 'We struggle to talk about this stuff' },
+    { key: 'more', icon: '✦', label: 'Things are good — we just want more of it' },
+  ]
+
+  const lengths = [
+    { key: 'under1', icon: '🌱', label: 'Less than a year' },
+    { key: '1to3', icon: '💛', label: '1–3 years' },
+    { key: '3to7', icon: '🔥', label: '3–7 years' },
+    { key: '7plus', icon: '✦', label: '7+ years' },
+  ]
+
   const handleSubmit = async () => {
     if (!name || !email || !password) return setError('Fill everything in.')
     if (password.length < 6) return setError('Password needs 6+ characters.')
     setLoading(true); setError('')
     const { data, error: e } = await supabase.auth.signUp({ email, password })
     if (e || !data.user) { setError(e?.message || 'Something went wrong.'); setLoading(false); return }
-    await supabase.from('profiles').insert({ id: data.user.id, name, email })
+    await supabase.from('profiles').insert({ id: data.user.id, name, email, onboarding_goal: goal, relationship_length: relLength })
     onSuccess(data.user)
   }
-  return (
-    <AuthShell title="Let's get started." onBack={onBack}>
-      <div className={styles.formGroup}><label className="label">Your name</label><input className="input" placeholder="First name is fine" value={name} onChange={e => setName(e.target.value)} /></div>
-      <div className={styles.formGroup}><label className="label">Email</label><input className="input" type="email" placeholder="you@somewhere.com" value={email} onChange={e => setEmail(e.target.value)} /></div>
-      <div className={styles.formGroup}><label className="label">Password</label><input className="input" type="password" placeholder="6+ characters" value={password} onChange={e => setPassword(e.target.value)} /></div>
-      {error && <p className="error-msg">{error}</p>}
-      <button className="btn" onClick={handleSubmit} disabled={loading}>{loading ? 'One sec...' : 'Create account →'}</button>
-    </AuthShell>
+
+  const progressBar = (
+    <div style={{position:'absolute' as const,top:0,left:0,right:0,height:'2px',background:'rgba(255,255,255,0.06)'}}>
+      <div style={{height:'100%',background:'#E8A598',width:`${progress}%`,transition:'width 0.4s ease'}} />
+    </div>
   )
+
+  if (step === 0) return (
+    <div className={styles.screen} style={{position:'relative' as const}}>
+      {progressBar}
+      <div className={styles.screenInner} style={{textAlign:'center' as const}}>
+        <div className={styles.logo} style={{marginBottom:'1.6rem'}}>u<em>Down</em></div>
+        <div style={{fontSize:'0.65rem',letterSpacing:'0.18em',textTransform:'uppercase' as const,color:'#E8A598',marginBottom:'0.8rem'}}>For couples</div>
+        <h2 className="serif" style={{fontSize:'1.5rem',color:'#F5F0E8',lineHeight:1.2,marginBottom:'0.8rem',fontWeight:400}}>Intimacy shouldn&apos;t require a conversation.</h2>
+        <p style={{fontSize:'0.82rem',color:'#8A847C',lineHeight:1.8,marginBottom:'2rem',maxWidth:'280px',margin:'0 auto 2rem'}}>uDown quietly checks in with both of you each evening. No awkward asks. No rejected feelings.</p>
+        <div style={{display:'flex',flexDirection:'column' as const,gap:'0.6rem',width:'100%',maxWidth:'300px'}}>
+          <button className="btn btn-yes" onClick={() => setStep(1)}>Let&apos;s go →</button>
+          <button className="btn btn-ghost" onClick={onBack}>Sign in instead</button>
+        </div>
+      </div>
+    </div>
+  )
+
+  if (step === 1) return (
+    <div className={styles.screen} style={{position:'relative' as const}}>
+      {progressBar}
+      <div className={styles.screenInner}>
+        <div style={{display:'flex',justifyContent:'space-between' as const,alignItems:'center' as const,width:'100%',marginBottom:'1.5rem'}}>
+          <button className={styles.backBtn} onClick={() => setStep(0)}>← back</button>
+          <span style={{fontSize:'0.65rem',color:'#8A847C'}}>1 of 4</span>
+        </div>
+        <h2 className="serif" style={{fontSize:'1.3rem',color:'#F5F0E8',marginBottom:'0.5rem',fontWeight:400}}>What brings you to uDown?</h2>
+        <p style={{fontSize:'0.78rem',color:'#8A847C',marginBottom:'1.5rem'}}>Pick the one that feels most true.</p>
+        <div style={{width:'100%',display:'flex',flexDirection:'column' as const,gap:'0.5rem'}}>
+          {goals.map(g => (
+            <button key={g.key} onClick={() => { setGoal(g.key); setTimeout(() => setStep(2), 300) }}
+              style={{width:'100%',padding:'0.8rem 1rem',border:`1px solid ${goal === g.key ? 'rgba(232,165,152,0.35)' : 'rgba(255,255,255,0.08)'}`,background:goal === g.key ? 'rgba(232,165,152,0.06)' : 'none',color:goal === g.key ? '#F5F0E8' : '#8A847C',fontSize:'0.8rem',cursor:'pointer',textAlign:'left' as const,display:'flex',gap:'0.8rem',alignItems:'center' as const,transition:'all 0.2s'}}>
+              <span style={{fontSize:'1rem'}}>{g.icon}</span>{g.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+
+  if (step === 2) return (
+    <div className={styles.screen} style={{position:'relative' as const}}>
+      {progressBar}
+      <div className={styles.screenInner}>
+        <div style={{display:'flex',justifyContent:'space-between' as const,alignItems:'center' as const,width:'100%',marginBottom:'1.5rem'}}>
+          <button className={styles.backBtn} onClick={() => setStep(1)}>← back</button>
+          <span style={{fontSize:'0.65rem',color:'#8A847C'}}>2 of 4</span>
+        </div>
+        <h2 className="serif" style={{fontSize:'1.3rem',color:'#F5F0E8',marginBottom:'0.5rem',fontWeight:400}}>How long have you been together?</h2>
+        <p style={{fontSize:'0.78rem',color:'#8A847C',marginBottom:'1.5rem'}}>No judgment. Just helps us understand.</p>
+        <div style={{width:'100%',display:'flex',flexDirection:'column' as const,gap:'0.5rem'}}>
+          {lengths.map(l => (
+            <button key={l.key} onClick={() => { setRelLength(l.key); setTimeout(() => setStep(3), 300) }}
+              style={{width:'100%',padding:'0.8rem 1rem',border:`1px solid ${relLength === l.key ? 'rgba(232,165,152,0.35)' : 'rgba(255,255,255,0.08)'}`,background:relLength === l.key ? 'rgba(232,165,152,0.06)' : 'none',color:relLength === l.key ? '#F5F0E8' : '#8A847C',fontSize:'0.8rem',cursor:'pointer',textAlign:'left' as const,display:'flex',gap:'0.8rem',alignItems:'center' as const,transition:'all 0.2s'}}>
+              <span style={{fontSize:'1rem'}}>{l.icon}</span>{l.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+
+  if (step === 3) return (
+    <div className={styles.screen} style={{position:'relative' as const}}>
+      {progressBar}
+      <div className={styles.screenInner}>
+        <div style={{display:'flex',justifyContent:'space-between' as const,alignItems:'center' as const,width:'100%',marginBottom:'1.5rem'}}>
+          <button className={styles.backBtn} onClick={() => setStep(2)}>← back</button>
+          <span style={{fontSize:'0.65rem',color:'#8A847C'}}>3 of 4</span>
+        </div>
+        <div className={styles.logo} style={{marginBottom:'1rem'}}>u<em>Down</em></div>
+        <h2 className="serif" style={{fontSize:'1.3rem',color:'#F5F0E8',marginBottom:'0.4rem',fontWeight:400}}>Create your account.</h2>
+        <p style={{fontSize:'0.78rem',color:'#8A847C',marginBottom:'1.5rem'}}>Just the basics. We don&apos;t need much.</p>
+        <div className={styles.authForm} style={{width:'100%'}}>
+          <div className={styles.formGroup}><label className="label">Your first name</label><input className="input" placeholder="First name is fine" value={name} onChange={e => setName(e.target.value)} /></div>
+          <div className={styles.formGroup}><label className="label">Email</label><input className="input" type="email" placeholder="you@somewhere.com" value={email} onChange={e => setEmail(e.target.value)} /></div>
+          <div className={styles.formGroup}><label className="label">Password</label><input className="input" type="password" placeholder="6+ characters" value={password} onChange={e => setPassword(e.target.value)} /></div>
+          {error && <p className="error-msg">{error}</p>}
+          <button className="btn btn-yes" onClick={handleSubmit} disabled={loading}>{loading ? 'One sec...' : 'Create account →'}</button>
+          <p style={{fontSize:'0.65rem',color:'#8A847C',textAlign:'center' as const,marginTop:'0.8rem'}}>Private by design. We don&apos;t sell your data.</p>
+        </div>
+      </div>
+    </div>
+  )
+
+  return null
 }
 
 function Login({ onBack, onForgot, onSuccess }: { onBack: () => void; onForgot: () => void; onSuccess: () => void }) {

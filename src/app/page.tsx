@@ -503,6 +503,26 @@ function CoupleSetup({ userId, generatedCode, setGeneratedCode, inviteCode, setI
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [connected, setConnected] = useState(false)
+  const [onboardStep, setOnboardStep] = useState(0) // 0=celebration, 1=notifications, 2=done
+
+  // Realtime listener — Person A gets notified when partner joins
+  useEffect(() => {
+    if (!generatedCode) return
+    const channel = supabase
+      .channel('couple-watch-' + userId)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'profiles',
+        filter: `id=eq.${userId}`,
+      }, (payload: any) => {
+        if (payload.new?.couple_id) {
+          setConnected(true)
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [generatedCode, userId])
 
   const generateCode = async () => {
     setLoading(true)
@@ -520,28 +540,55 @@ function CoupleSetup({ userId, generatedCode, setGeneratedCode, inviteCode, setI
     else { setConnected(true) }
   }
 
-  if (connected) return (
+  const requestNotifications = async () => {
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission === 'granted') {
+        const { registerPush } = await import('@/lib/push')
+        const sub = await registerPush()
+        if (sub) await fetch('/api/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription: sub, userId }) })
+      }
+    } catch (e) { console.error(e) }
+    setOnboardStep(2)
+  }
+
+  // Celebration screen
+  if (connected && onboardStep === 0) return (
     <div className={styles.screen}>
       <div className={styles.screenInner} style={{textAlign:'center' as const}}>
-        <div style={{fontSize:'2.5rem',color:'#E8A598',marginBottom:'1rem',animation:'pulse 2s ease-in-out infinite'}}>✦</div>
-        <h2 className="serif" style={{fontSize:'1.8rem',color:'#F5F0E8',marginBottom:'0.5rem',fontWeight:400}}>It&apos;s a match!</h2>
-        <p style={{fontSize:'0.9rem',color:'#E8A598',fontFamily:"'DM Serif Display',serif",fontStyle:'italic',marginBottom:'0.6rem'}}>I think you&apos;re gonna be good at this 😉</p>
-        <p style={{fontSize:'0.8rem',color:'#8A847C',lineHeight:1.8,marginBottom:'2rem'}}>Your first prompt arrives this evening. Both of you. At the same time.<br/>If you both say yes — you&apos;ll both know.</p>
-        <div style={{width:'100%',border:'1px solid rgba(232,165,152,0.15)',padding:'1rem',marginBottom:'1.5rem'}}>
-          <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginBottom:'0.6rem'}}>Tonight you&apos;ll both receive</div>
-          <div style={{background:'#2A2520',borderRadius:'8px',padding:'0.8rem',textAlign:'left' as const,border:'1px solid rgba(255,255,255,0.06)'}}>
-            <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'4px'}}>
-              <div style={{width:'18px',height:'18px',background:'#C4614A',borderRadius:'4px',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'DM Serif Display',serif",fontStyle:'italic',fontSize:'8px',color:'#F5F0E8',flexShrink:0}}>u</div>
-              <span style={{fontSize:'10px',color:'#F5F0E8',fontWeight:500}}>uDown</span>
-            </div>
-            <div style={{fontSize:'11px',color:'#F5F0E8',marginBottom:'2px'}}>Is tonight the night?</div>
-            <div style={{fontSize:'10px',color:'#8A847C'}}>uDown? 🌙</div>
-          </div>
-        </div>
-        <button className="btn btn-yes" onClick={onLinked}>Let&apos;s go →</button>
+        <div style={{fontSize:'2.8rem',color:'#E8A598',marginBottom:'1rem',animation:'pulse 2s ease-in-out infinite'}}>✦</div>
+        <h2 className="serif" style={{fontSize:'2rem',color:'#F5F0E8',marginBottom:'0.5rem',fontWeight:400}}>It&apos;s a match!</h2>
+        <p style={{fontSize:'1rem',color:'#E8A598',fontFamily:"'DM Serif Display',serif",fontStyle:'italic',marginBottom:'1rem'}}>I think you&apos;re gonna be good at this 😉</p>
+        <p style={{fontSize:'0.82rem',color:'#8A847C',lineHeight:1.85,marginBottom:'2rem',maxWidth:'280px',margin:'0 auto 2rem'}}>
+          Your first prompt arrives this evening. Both of you. At the same time. If you both say yes — you&apos;ll both know.
+        </p>
+        <button className="btn btn-yes" style={{marginBottom:'0.8rem'}} onClick={() => setOnboardStep(1)}>Set up notifications →</button>
+        <button className="btn btn-ghost" onClick={() => setOnboardStep(2)}>Do this later</button>
       </div>
     </div>
   )
+
+  // Notification permission screen
+  if (connected && onboardStep === 1) return (
+    <div className={styles.screen}>
+      <div className={styles.screenInner} style={{textAlign:'center' as const}}>
+        <div style={{fontSize:'2.5rem',marginBottom:'1rem'}}>🔔</div>
+        <h2 className="serif" style={{fontSize:'1.6rem',color:'#F5F0E8',marginBottom:'0.5rem',fontWeight:400}}>Don&apos;t miss your prompt.</h2>
+        <p style={{fontSize:'0.82rem',color:'#8A847C',lineHeight:1.85,marginBottom:'2rem'}}>
+          uDown asks you both a question every evening. Enable notifications so you never miss it — and so you know the moment your partner says yes.
+        </p>
+        <button className="btn btn-yes" style={{marginBottom:'0.8rem'}} onClick={requestNotifications}>Enable notifications →</button>
+        <button className="btn btn-ghost" onClick={() => setOnboardStep(2)}>Maybe later</button>
+        <p style={{fontSize:'0.65rem',color:'#8A847C',opacity:0.6,marginTop:'1rem'}}>You can enable this anytime from your settings.</p>
+      </div>
+    </div>
+  )
+
+  // Done — go to app
+  if (connected && onboardStep === 2) {
+    onLinked()
+    return null
+  }
 
   return (
     <div className={styles.screen}><div className={styles.screenInner}>

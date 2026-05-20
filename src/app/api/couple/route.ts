@@ -1,10 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import webpush from 'web-push'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+webpush.setVapidDetails(
+  'mailto:' + process.env.VAPID_EMAIL!,
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+  process.env.VAPID_PRIVATE_KEY!
+)
+
+async function sendPush(userId: string, payload: object) {
+  const { data: sub } = await supabase
+    .from('push_subscriptions').select('subscription').eq('user_id', userId).single()
+  if (!sub) return
+  try {
+    await webpush.sendNotification(JSON.parse(sub.subscription), JSON.stringify(payload))
+  } catch (err: any) {
+    if (err.statusCode === 410) await supabase.from('push_subscriptions').delete().eq('user_id', userId)
+  }
+}
 
 function generateCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase()
@@ -57,6 +75,17 @@ export async function POST(req: NextRequest) {
 
     // Clean up invite
     await supabase.from('invites').delete().eq('code', inviteCode.toUpperCase())
+
+    // Get both names for the notification
+    const { data: joinerProfile } = await supabase.from('profiles').select('name').eq('id', userId).single()
+    const joinerName = joinerProfile?.name || 'Your partner'
+
+    // Notify Person A that their partner joined
+    await sendPush(invite.created_by, {
+      title: '✦ It's a match!',
+      body: `${joinerName} just joined. I think you're gonna be good at this 😉`,
+      type: 'coupled',
+    })
 
     return NextResponse.json({ success: true, coupleId: couple.id })
   }

@@ -505,9 +505,26 @@ function CoupleSetup({ userId, generatedCode, setGeneratedCode, inviteCode, setI
   const [connected, setConnected] = useState(false)
   const [onboardStep, setOnboardStep] = useState(0) // 0=celebration, 1=notifications, 2=done
 
-  // Realtime listener — Person A gets notified when partner joins
+  // Poll for couple_id — fires after push notification confirms partner joined
   useEffect(() => {
     if (!generatedCode) return
+    let cancelled = false
+
+    const poll = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('couple_id')
+        .eq('id', userId)
+        .single()
+      if (data?.couple_id && !cancelled) {
+        setConnected(true)
+      }
+    }
+
+    // Poll every 3 seconds while waiting
+    const interval = setInterval(poll, 3000)
+
+    // Also try realtime as a backup
     const channel = supabase
       .channel('couple-watch-' + userId)
       .on('postgres_changes', {
@@ -516,12 +533,17 @@ function CoupleSetup({ userId, generatedCode, setGeneratedCode, inviteCode, setI
         table: 'profiles',
         filter: `id=eq.${userId}`,
       }, (payload: any) => {
-        if (payload.new?.couple_id) {
+        if (payload.new?.couple_id && !cancelled) {
           setConnected(true)
         }
       })
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+      supabase.removeChannel(channel)
+    }
   }, [generatedCode, userId])
 
   const generateCode = async () => {

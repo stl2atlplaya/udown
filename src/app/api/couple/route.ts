@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
 
     // Notify Person A that their partner joined
     await sendPush(invite.created_by, {
-      title: '✦ It's a match!',
+      title: "✦ It's a match!",
       body: `${joinerName} just joined. I think you're gonna be good at this 😉`,
       type: 'coupled',
     })

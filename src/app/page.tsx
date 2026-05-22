@@ -947,13 +947,32 @@ function Home({ profile, partnerName, todayResponse, todayMood, matched, partner
             <div style={{textAlign:'center' as const, marginBottom:'1.5rem'}}>
               <div style={{fontSize:'2.5rem',animation:'pulse 2s ease-in-out infinite',marginBottom:'0.8rem'}}>✦</div>
               <h2 className={`${styles.matchTitle} serif`} style={{marginBottom:'0.4rem'}}>You're both down.</h2>
-              <p style={{fontSize:'0.8rem',color:'#8A847C',lineHeight:1.7}}>
+              <p style={{fontSize:'0.8rem',color:'#8A847C',lineHeight:1.7,marginBottom: sharedMoods.length > 0 ? '1rem' : 0}}>
                 {sharedMoods.length > 0
-                  ? `You're both feeling ${sharedMoods.map(k => MOODS.find(m => m.key === k)?.label?.split(' ').slice(1).join(' ').toLowerCase()).join(' and ')}.`
-                  : myMoodLabel && matchedMoodLabel
-                  ? `You: ${myMoodLabel} · Them: ${matchedMoodLabel}`
-                  : "Tonight's the night."}
+                  ? `You're both feeling it the same way.`
+                  : `Tonight's the night.`}
               </p>
+
+              {sharedMoods.length > 0 && (
+                <div style={{width:'100%',maxWidth:'340px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.5rem',marginBottom:'0.5rem'}}>
+                  {sharedMoods.map(key => {
+                    const m = MOODS.find(m => m.key === key)
+                    if (!m) return null
+                    return (
+                      <div key={key} style={{
+                        padding:'0.6rem',
+                        border:'1px solid rgba(232,165,152,0.6)',
+                        background:'rgba(232,165,152,0.12)',
+                        position:'relative' as const,
+                      }}>
+                        <div style={{fontSize:'0.72rem',color:'#E8A598'}}>{m.label}</div>
+                        <div style={{fontSize:'0.58rem',color:'#8A847C',marginTop:'2px',opacity:0.7}}>{m.desc}</div>
+                        <div style={{position:'absolute' as const,top:'4px',right:'6px',fontSize:'0.55rem',color:'#E8A598'}}>✦</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Match counter + milestone */}

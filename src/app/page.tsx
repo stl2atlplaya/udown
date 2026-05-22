@@ -624,6 +624,40 @@ function CoupleSetup({ userId, generatedCode, setGeneratedCode, inviteCode, setI
   )
 
   // Step 2 — Prompt time
+  const timeWindows = [
+    { key: 'morning', label: 'Morning', sub: '7 – 10 am', min: 420, max: 600 },
+    { key: 'afternoon', label: 'Afternoon', sub: '12 – 3 pm', min: 720, max: 900 },
+    { key: 'evening', label: 'Evening', sub: '5 – 8 pm', min: 1020, max: 1200 },
+    { key: 'custom', label: 'Custom', sub: 'You choose', min: 420, max: 1380 },
+  ]
+  const [timeWindow, setTimeWindow] = useState('evening')
+  const [sameTime, setSameTime] = useState(false)
+
+  const formatTime = (mins: number) => {
+    const h = Math.floor(mins / 60)
+    const m = mins % 60
+    const ampm = h >= 12 ? 'pm' : 'am'
+    const h12 = h > 12 ? h - 12 : (h === 0 ? 12 : h)
+    return `${h12}:${String(m).padStart(2,'0')}${ampm}`
+  }
+
+  const randomInWindow = (min: number, max: number) => {
+    const steps = Math.floor((max - min) / 5)
+    return min + Math.floor(Math.random() * steps) * 5
+  }
+
+  const saveTimeAndContinue = async () => {
+    const win = timeWindows.find(t => t.key === timeWindow)!
+    const minutes = timeWindow === 'custom' ? onboardNotifMinutes : randomInWindow(win.min, win.max)
+    await fetch('/api/profile', { method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ userId, custom_notif_hour: minutes, partner_name: partnerNameInput.trim() || null }) })
+    if (sameTime) {
+      await fetch('/api/couple', { method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ action: 'set_same_time', userId }) })
+    }
+    setOnboardStep(3)
+  }
+
   if (connected && onboardStep === 2) return (
     <div className={styles.screen} style={{position:'relative' as const}}>
       {progressBar(2)}
@@ -632,33 +666,43 @@ function CoupleSetup({ userId, generatedCode, setGeneratedCode, inviteCode, setI
           <button className={styles.backBtn} onClick={() => setOnboardStep(1)}>← back</button>
           <span style={{fontSize:'0.65rem',color:'#8A847C'}}>2 of 4</span>
         </div>
-        <h2 style={{fontSize:'1.4rem',fontFamily:"'DM Serif Display',serif",fontStyle:'italic',fontWeight:400,marginBottom:'0.5rem',color:'#F5F0E8'}}>When should we check in?</h2>
-        <p style={{fontSize:'0.82rem',color:'#8A847C',marginBottom:'2rem',lineHeight:1.75}}>Pick a time that works for your evenings. Your partner sets their own.</p>
-        <div style={{width:'100%',marginBottom:'1.5rem'}}>
-          <div style={{display:'flex',alignItems:'center' as const,gap:'1rem',marginBottom:'0.8rem'}}>
-            <input type="range" min={840} max={1260} step={5}
-              value={onboardNotifMinutes}
-              onChange={e => setOnboardNotifMinutes(parseInt(e.target.value))}
-              style={{flex:1}} />
-            <span style={{fontSize:'1rem',color:'#E8A598',fontFamily:"'DM Serif Display',serif",fontStyle:'italic',minWidth:'55px'}}>
-              {(() => {
-                const h = Math.floor(onboardNotifMinutes / 60)
-                const m = onboardNotifMinutes % 60
-                const ampm = h >= 12 ? 'pm' : 'am'
-                const h12 = h > 12 ? h - 12 : h
-                return `${h12}:${String(m).padStart(2,'0')}${ampm}`
-              })()}
-            </span>
-          </div>
-          <div style={{fontSize:'0.7rem',color:'#8A847C',display:'flex',justifyContent:'space-between' as const}}>
-            <span>2:00pm</span><span>9:00pm</span>
-          </div>
+        <h2 style={{fontSize:'1.4rem',fontFamily:"'DM Serif Display',serif",fontStyle:'italic',fontWeight:400,marginBottom:'0.5rem',color:'#F5F0E8'}}>When would you like to be prompted?</h2>
+        <p style={{fontSize:'0.82rem',color:'#8A847C',marginBottom:'1.5rem',lineHeight:1.75}}>Your partner sets their own time independently.</p>
+
+        <div style={{width:'100%',display:'flex',flexDirection:'column' as const,gap:'0.5rem',marginBottom:'1rem'}}>
+          {timeWindows.map(t => (
+            <button key={t.key} onClick={() => { setTimeWindow(t.key); if (t.key !== 'custom') setOnboardNotifMinutes(randomInWindow(t.min, t.max)) }}
+              style={{width:'100%',padding:'0.8rem 1rem',border:`1px solid ${timeWindow === t.key ? 'rgba(232,165,152,0.4)' : 'rgba(255,255,255,0.08)'}`,background:timeWindow === t.key ? 'rgba(232,165,152,0.08)' : 'none',cursor:'pointer',display:'flex',justifyContent:'space-between' as const,alignItems:'center' as const,transition:'all 0.2s'}}>
+              <span style={{fontSize:'0.85rem',color:timeWindow === t.key ? '#F5F0E8' : '#8A847C'}}>{t.label}</span>
+              <span style={{fontSize:'0.75rem',color:timeWindow === t.key ? '#E8A598' : '#8A847C'}}>{t.sub}</span>
+            </button>
+          ))}
         </div>
-        <button className="btn btn-yes" onClick={async () => {
-          await fetch('/api/profile', { method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ userId, custom_notif_hour: onboardNotifMinutes, partner_name: partnerNameInput.trim() || null }) })
-          setOnboardStep(3)
-        }}>Save →</button>
+
+        {timeWindow === 'custom' && (
+          <div style={{width:'100%',marginBottom:'1rem',padding:'1rem',border:'1px solid rgba(232,165,152,0.15)'}}>
+            <div style={{display:'flex',alignItems:'center' as const,gap:'1rem',marginBottom:'0.5rem'}}>
+              <input type="range" min={420} max={1380} step={5}
+                value={onboardNotifMinutes}
+                onChange={e => setOnboardNotifMinutes(parseInt(e.target.value))}
+                style={{flex:1}} />
+              <span style={{fontSize:'1rem',color:'#E8A598',fontFamily:"'DM Serif Display',serif",fontStyle:'italic',minWidth:'55px'}}>{formatTime(onboardNotifMinutes)}</span>
+            </div>
+            <div style={{fontSize:'0.68rem',color:'#8A847C',display:'flex',justifyContent:'space-between' as const}}>
+              <span>7:00am</span><span>11:00pm</span>
+            </div>
+          </div>
+        )}
+
+        <button onClick={() => setSameTime(!sameTime)}
+          style={{width:'100%',padding:'0.8rem 1rem',border:`1px solid ${sameTime ? 'rgba(232,165,152,0.4)' : 'rgba(255,255,255,0.08)'}`,background:sameTime ? 'rgba(232,165,152,0.06)' : 'none',cursor:'pointer',display:'flex',alignItems:'center' as const,gap:'0.8rem',marginBottom:'1.2rem',transition:'all 0.2s'}}>
+          <div style={{width:'16px',height:'16px',border:`1px solid ${sameTime ? '#E8A598' : 'rgba(255,255,255,0.2)'}`,background:sameTime ? 'rgba(232,165,152,0.2)' : 'none',flexShrink:0,display:'flex',alignItems:'center' as const,justifyContent:'center' as const}}>
+            {sameTime && <span style={{fontSize:'10px',color:'#E8A598'}}>✓</span>}
+          </div>
+          <span style={{fontSize:'0.8rem',color:sameTime ? '#F5F0E8' : '#8A847C',textAlign:'left' as const,lineHeight:1.5}}>My partner and I want to be notified at the same time</span>
+        </button>
+
+        <button className="btn btn-yes" onClick={saveTimeAndContinue}>Save →</button>
       </div>
     </div>
   )
@@ -692,13 +736,7 @@ function CoupleSetup({ userId, generatedCode, setGeneratedCode, inviteCode, setI
         <div style={{fontSize:'2.2rem',color:'#E8A598',marginBottom:'1rem'}}>✦</div>
         <h2 style={{fontSize:'1.8rem',fontFamily:"'DM Serif Display',serif",fontStyle:'italic',fontWeight:400,marginBottom:'0.5rem',color:'#F5F0E8'}}>You&apos;re all set.</h2>
         <p style={{fontSize:'0.85rem',color:'#8A847C',lineHeight:1.85,marginBottom:'2rem'}}>
-          Your first prompt arrives tonight at {(() => {
-            const h = Math.floor(onboardNotifMinutes / 60)
-            const m = onboardNotifMinutes % 60
-            const ampm = h >= 12 ? 'pm' : 'am'
-            const h12 = h > 12 ? h - 12 : h
-            return `${h12}:${String(m).padStart(2,'0')}${ampm}`
-          })()}. Both of you. At the same time.
+          Your first prompt arrives tonight. Both of you. At the same time.<br/>If you both say yes — you&apos;ll both know.
         </p>
         <div style={{width:'100%',border:'1px solid rgba(232,165,152,0.15)',padding:'1rem',marginBottom:'2rem'}}>
           <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginBottom:'0.6rem'}}>Tonight you&apos;ll both receive</div>

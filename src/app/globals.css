@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300;1,9..144,400&display=swap');
 
 :root {
   --cream: #F5F0E8;
@@ -17,7 +17,7 @@ html, body {
   height: 100%;
   background: var(--charcoal);
   color: var(--cream);
-  font-family: 'DM Mono', monospace;
+  font-family: 'Fraunces', serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -32,7 +32,7 @@ body::after {
   z-index: 9999;
 }
 
-input, button { font-family: 'DM Mono', monospace; }
+input, button { font-family: 'Fraunces', serif; font-weight: 400; }
 
 .btn {
   display: inline-block;
@@ -41,7 +41,7 @@ input, button { font-family: 'DM Mono', monospace; }
   border: none;
   padding: 0.9rem 2rem;
   font-size: 0.78rem;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
   transition: background 0.25s, transform 0.1s;
@@ -78,7 +78,7 @@ input, button { font-family: 'DM Mono', monospace; }
   border: 1px solid rgba(232,165,152,0.2);
   color: var(--cream);
   padding: 0.9rem 1.2rem;
-  font-family: 'DM Mono', monospace;
+  font-family: 'Fraunces', serif;
   font-size: 0.82rem;
   width: 100%;
   outline: none;

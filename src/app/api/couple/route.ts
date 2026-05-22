@@ -90,6 +90,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, coupleId: couple.id })
   }
 
+  if (action === 'set_same_time') {
+    const { data: profile } = await supabase.from('profiles').select('couple_id').eq('id', userId).single()
+    if (!profile?.couple_id) return NextResponse.json({ error: 'Not coupled' }, { status: 400 })
+    await supabase.from('couples').update({ same_time_notif: true }).eq('id', profile.couple_id)
+    return NextResponse.json({ success: true })
+  }
+
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
 }
 

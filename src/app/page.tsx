@@ -503,7 +503,9 @@ function CoupleSetup({ userId, generatedCode, setGeneratedCode, inviteCode, setI
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [connected, setConnected] = useState(false)
-  const [onboardStep, setOnboardStep] = useState(0) // 0=celebration, 1=notifications, 2=done
+  const [onboardStep, setOnboardStep] = useState(0)
+  const [partnerNameInput, setPartnerNameInput] = useState('')
+  const [onboardNotifMinutes, setOnboardNotifMinutes] = useState(1140) // default 7pm
 
   // Poll for couple_id — fires after push notification confirms partner joined
   useEffect(() => {
@@ -571,43 +573,151 @@ function CoupleSetup({ userId, generatedCode, setGeneratedCode, inviteCode, setI
         if (sub) await fetch('/api/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription: sub, userId }) })
       }
     } catch (e) { console.error(e) }
-    setOnboardStep(2)
+    setOnboardStep(4)
   }
 
-  // Celebration screen
+  // Progress bar for post-match onboarding
+  const postMatchProgress = [20, 40, 60, 80, 100]
+
+  const progressBar = (step: number) => (
+    <div style={{position:'absolute' as const,top:0,left:0,right:0,height:'2px',background:'rgba(255,255,255,0.06)'}}>
+      <div style={{height:'100%',background:'#E8A598',width:`${postMatchProgress[step]}%`,transition:'width 0.4s ease'}} />
+    </div>
+  )
+
+  // Step 0 — Celebration
   if (connected && onboardStep === 0) return (
-    <div className={styles.screen}>
+    <div className={styles.screen} style={{position:'relative' as const}}>
+      {progressBar(0)}
       <div className={styles.screenInner} style={{textAlign:'center' as const}}>
         <div style={{fontSize:'2.8rem',color:'#E8A598',marginBottom:'1rem',animation:'pulse 2s ease-in-out infinite'}}>✦</div>
-        <h2 className="serif" style={{fontSize:'2rem',color:'#F5F0E8',marginBottom:'0.5rem',fontWeight:400}}>It&apos;s a match!</h2>
-        <p style={{fontSize:'1rem',color:'#E8A598',fontFamily:"'DM Serif Display',serif",fontStyle:'italic',marginBottom:'1rem'}}>I think you&apos;re gonna be good at this 😉</p>
-        <p style={{fontSize:'0.82rem',color:'#8A847C',lineHeight:1.85,marginBottom:'2rem',maxWidth:'280px',margin:'0 auto 2rem'}}>
-          Your first prompt arrives this evening. Both of you. At the same time. If you both say yes — you&apos;ll both know.
-        </p>
-        <button className="btn btn-yes" style={{marginBottom:'0.8rem'}} onClick={() => setOnboardStep(1)}>Set up notifications →</button>
-        <button className="btn btn-ghost" onClick={() => setOnboardStep(2)}>Do this later</button>
+        <h2 style={{fontSize:'2rem',color:'#F5F0E8',marginBottom:'0.5rem',fontFamily:"'DM Serif Display',serif",fontStyle:'italic',fontWeight:400}}>It&apos;s a match!</h2>
+        <p style={{fontSize:'1rem',color:'#E8A598',fontFamily:"'DM Serif Display',serif",fontStyle:'italic',marginBottom:'1.5rem'}}>I think you&apos;re gonna be good at this 😉</p>
+        <p style={{fontSize:'0.85rem',color:'#8A847C',lineHeight:1.85,marginBottom:'2rem'}}>Let&apos;s get you both set up. Takes two minutes.</p>
+        <button className="btn btn-yes" onClick={() => setOnboardStep(1)}>Let&apos;s go →</button>
       </div>
     </div>
   )
 
-  // Notification permission screen
+  // Step 1 — Partner name
   if (connected && onboardStep === 1) return (
-    <div className={styles.screen}>
+    <div className={styles.screen} style={{position:'relative' as const}}>
+      {progressBar(1)}
       <div className={styles.screenInner} style={{textAlign:'center' as const}}>
-        <div style={{fontSize:'2.5rem',marginBottom:'1rem'}}>🔔</div>
-        <h2 className="serif" style={{fontSize:'1.6rem',color:'#F5F0E8',marginBottom:'0.5rem',fontWeight:400}}>Don&apos;t miss your prompt.</h2>
-        <p style={{fontSize:'0.82rem',color:'#8A847C',lineHeight:1.85,marginBottom:'2rem'}}>
-          uDown asks you both a question every evening. Enable notifications so you never miss it — and so you know the moment your partner says yes.
-        </p>
-        <button className="btn btn-yes" style={{marginBottom:'0.8rem'}} onClick={requestNotifications}>Enable notifications →</button>
-        <button className="btn btn-ghost" onClick={() => setOnboardStep(2)}>Maybe later</button>
-        <p style={{fontSize:'0.65rem',color:'#8A847C',opacity:0.6,marginTop:'1rem'}}>You can enable this anytime from your settings.</p>
+        <div style={{display:'flex',justifyContent:'space-between' as const,alignItems:'center' as const,width:'100%',marginBottom:'1.5rem'}}>
+          <button className={styles.backBtn} onClick={() => setOnboardStep(0)}>← back</button>
+          <span style={{fontSize:'0.65rem',color:'#8A847C'}}>1 of 4</span>
+        </div>
+        <h2 style={{fontSize:'1.4rem',fontFamily:"'DM Serif Display',serif",fontStyle:'italic',fontWeight:400,marginBottom:'0.5rem',color:'#F5F0E8'}}>What&apos;s your partner&apos;s name?</h2>
+        <p style={{fontSize:'0.82rem',color:'#8A847C',marginBottom:'1.5rem',lineHeight:1.75}}>We&apos;ll use it to make your experience feel personal.</p>
+        <div className={styles.formGroup} style={{width:'100%',marginBottom:'1rem'}}>
+          <input className="input" placeholder="Their first name"
+            value={partnerNameInput} onChange={e => setPartnerNameInput(e.target.value)}
+            style={{textAlign:'center' as const,fontSize:'1rem',fontFamily:"'DM Serif Display',serif",fontStyle:'italic'}}
+            onKeyDown={e => e.key === 'Enter' && partnerNameInput.trim() && setOnboardStep(2)}
+            autoFocus />
+        </div>
+        <button className="btn btn-yes" onClick={() => setOnboardStep(2)} disabled={!partnerNameInput.trim()}>Continue →</button>
+        <button className="btn btn-ghost" style={{marginTop:'0.5rem'}} onClick={() => setOnboardStep(2)}>Skip for now</button>
       </div>
     </div>
   )
 
-  // Done — go to app
-  if (connected && onboardStep === 2) {
+  // Step 2 — Prompt time
+  if (connected && onboardStep === 2) return (
+    <div className={styles.screen} style={{position:'relative' as const}}>
+      {progressBar(2)}
+      <div className={styles.screenInner} style={{textAlign:'center' as const}}>
+        <div style={{display:'flex',justifyContent:'space-between' as const,alignItems:'center' as const,width:'100%',marginBottom:'1.5rem'}}>
+          <button className={styles.backBtn} onClick={() => setOnboardStep(1)}>← back</button>
+          <span style={{fontSize:'0.65rem',color:'#8A847C'}}>2 of 4</span>
+        </div>
+        <h2 style={{fontSize:'1.4rem',fontFamily:"'DM Serif Display',serif",fontStyle:'italic',fontWeight:400,marginBottom:'0.5rem',color:'#F5F0E8'}}>When should we check in?</h2>
+        <p style={{fontSize:'0.82rem',color:'#8A847C',marginBottom:'2rem',lineHeight:1.75}}>Pick a time that works for your evenings. Your partner sets their own.</p>
+        <div style={{width:'100%',marginBottom:'1.5rem'}}>
+          <div style={{display:'flex',alignItems:'center' as const,gap:'1rem',marginBottom:'0.8rem'}}>
+            <input type="range" min={840} max={1260} step={5}
+              value={onboardNotifMinutes}
+              onChange={e => setOnboardNotifMinutes(parseInt(e.target.value))}
+              style={{flex:1}} />
+            <span style={{fontSize:'1rem',color:'#E8A598',fontFamily:"'DM Serif Display',serif",fontStyle:'italic',minWidth:'55px'}}>
+              {(() => {
+                const h = Math.floor(onboardNotifMinutes / 60)
+                const m = onboardNotifMinutes % 60
+                const ampm = h >= 12 ? 'pm' : 'am'
+                const h12 = h > 12 ? h - 12 : h
+                return `${h12}:${String(m).padStart(2,'0')}${ampm}`
+              })()}
+            </span>
+          </div>
+          <div style={{fontSize:'0.7rem',color:'#8A847C',display:'flex',justifyContent:'space-between' as const}}>
+            <span>2:00pm</span><span>9:00pm</span>
+          </div>
+        </div>
+        <button className="btn btn-yes" onClick={async () => {
+          await fetch('/api/profile', { method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ userId, custom_notif_hour: onboardNotifMinutes, partner_name: partnerNameInput.trim() || null }) })
+          setOnboardStep(3)
+        }}>Save →</button>
+      </div>
+    </div>
+  )
+
+  // Step 3 — Notifications
+  if (connected && onboardStep === 3) return (
+    <div className={styles.screen} style={{position:'relative' as const}}>
+      {progressBar(3)}
+      <div className={styles.screenInner} style={{textAlign:'center' as const}}>
+        <div style={{display:'flex',justifyContent:'space-between' as const,alignItems:'center' as const,width:'100%',marginBottom:'1.5rem'}}>
+          <button className={styles.backBtn} onClick={() => setOnboardStep(2)}>← back</button>
+          <span style={{fontSize:'0.65rem',color:'#8A847C'}}>3 of 4</span>
+        </div>
+        <div style={{fontSize:'2.2rem',marginBottom:'1rem'}}>🔔</div>
+        <h2 style={{fontSize:'1.4rem',fontFamily:"'DM Serif Display',serif",fontStyle:'italic',fontWeight:400,marginBottom:'0.5rem',color:'#F5F0E8'}}>Don&apos;t miss your prompt.</h2>
+        <p style={{fontSize:'0.82rem',color:'#8A847C',lineHeight:1.85,marginBottom:'2rem'}}>
+          This is how we reach you each evening. Without it, the whole thing doesn&apos;t work. Enable it now — you can always adjust later.
+        </p>
+        <button className="btn btn-yes" style={{marginBottom:'0.6rem'}} onClick={requestNotifications}>Enable notifications →</button>
+        <button className="btn btn-ghost" onClick={() => setOnboardStep(4)}>Maybe later</button>
+        <p style={{fontSize:'0.65rem',color:'#8A847C',opacity:0.5,marginTop:'1rem'}}>You can enable this anytime from Settings.</p>
+      </div>
+    </div>
+  )
+
+  // Step 4 — All set
+  if (connected && onboardStep === 4) return (
+    <div className={styles.screen} style={{position:'relative' as const}}>
+      {progressBar(4)}
+      <div className={styles.screenInner} style={{textAlign:'center' as const}}>
+        <div style={{fontSize:'2.2rem',color:'#E8A598',marginBottom:'1rem'}}>✦</div>
+        <h2 style={{fontSize:'1.8rem',fontFamily:"'DM Serif Display',serif",fontStyle:'italic',fontWeight:400,marginBottom:'0.5rem',color:'#F5F0E8'}}>You&apos;re all set.</h2>
+        <p style={{fontSize:'0.85rem',color:'#8A847C',lineHeight:1.85,marginBottom:'2rem'}}>
+          Your first prompt arrives tonight at {(() => {
+            const h = Math.floor(onboardNotifMinutes / 60)
+            const m = onboardNotifMinutes % 60
+            const ampm = h >= 12 ? 'pm' : 'am'
+            const h12 = h > 12 ? h - 12 : h
+            return `${h12}:${String(m).padStart(2,'0')}${ampm}`
+          })()}. Both of you. At the same time.
+        </p>
+        <div style={{width:'100%',border:'1px solid rgba(232,165,152,0.15)',padding:'1rem',marginBottom:'2rem'}}>
+          <div style={{fontSize:'0.6rem',letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8A847C',marginBottom:'0.6rem'}}>Tonight you&apos;ll both receive</div>
+          <div style={{background:'#2A2520',borderRadius:'8px',padding:'0.8rem',textAlign:'left' as const,border:'1px solid rgba(255,255,255,0.06)'}}>
+            <div style={{display:'flex',alignItems:'center' as const,gap:'6px',marginBottom:'4px'}}>
+              <div style={{width:'18px',height:'18px',background:'#C4614A',borderRadius:'4px',display:'flex',alignItems:'center' as const,justifyContent:'center' as const,fontFamily:"'DM Serif Display',serif",fontStyle:'italic',fontSize:'8px',color:'#F5F0E8',flexShrink:0}}>u</div>
+              <span style={{fontSize:'10px',color:'#F5F0E8',fontWeight:500}}>uDown</span>
+            </div>
+            <div style={{fontSize:'11px',color:'#F5F0E8',marginBottom:'2px'}}>Is tonight the night?</div>
+            <div style={{fontSize:'10px',color:'#8A847C'}}>uDown? 🌙</div>
+          </div>
+        </div>
+        <button className="btn btn-yes" onClick={onLinked}>Go to the app →</button>
+      </div>
+    </div>
+  )
+
+  // Done
+  if (connected && onboardStep >= 5) {
     onLinked()
     return null
   }

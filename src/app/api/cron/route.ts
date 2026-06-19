@@ -29,108 +29,133 @@ const REMINDER_MESSAGES = [
   { title: "One more time...", body: "uDown? 🌙" },
 ]
 
-async function sendToUser(subscription: string, payload: string): Promise<'sent' | 'stale'> {
+function getEstNow() {
+  const now = new Date()
+  const estStr = now.toLocaleString('en-US', { timeZone: 'America/New_York' })
+  return new Date(estStr)
+}
+
+function minutesToday(minutes: number): Date {
+  const est = getEstNow()
+  const d = new Date(est)
+  d.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0)
+  return d
+}
+
+function randomInRange(min: number, max: number): number {
+  const steps = Math.floor((max - min) / 5)
+  return min + Math.floor(Math.random() * steps) * 5
+}
+
+async function sendPush(subscription: string, payload: string): Promise<'sent' | 'stale' | 'error'> {
   try {
     await webpush.sendNotification(JSON.parse(subscription), payload)
     return 'sent'
   } catch (err: any) {
-    if (err.statusCode === 410) return 'stale'
-    return 'stale'
+    if (err.statusCode === 410 || err.statusCode === 404) return 'stale'
+    return 'error'
   }
 }
 
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const auth = req.headers.get('authorization')
+  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const nowUtc = new Date()
-  const todayEst = new Date(nowUtc.toLocaleString('en-US', { timeZone: 'America/New_York' }))
-  const todayKey = todayEst.toISOString().split('T')[0]
+  const estNow = getEstNow()
+  const nowMinutes = estNow.getHours() * 60 + estNow.getMinutes()
+  const todayKey = estNow.toLocaleDateString('en-CA')
 
-  // --- Handle pending reminders ---
+  // --- Handle reminders first ---
   const { data: remindSubs } = await supabase
     .from('push_subscriptions')
     .select('user_id, subscription, remind_at')
     .not('remind_at', 'is', null)
-    .lte('remind_at', nowUtc.toISOString())
 
   if (remindSubs && remindSubs.length > 0) {
-    const remMsg = REMINDER_MESSAGES[Math.floor(Math.random() * REMINDER_MESSAGES.length)]
-    const remPayload = JSON.stringify({ title: remMsg.title, body: remMsg.body, type: 'daily' })
     const staleUsers: string[] = []
-
-    await Promise.allSettled(remindSubs.map(async ({ user_id, subscription }) => {
-      const result = await sendToUser(subscription, remPayload)
-      if (result === 'stale') staleUsers.push(user_id)
+    await Promise.allSettled(remindSubs.map(async ({ user_id, subscription, remind_at }) => {
+      if (!remind_at) return
+      const remindTime = new Date(remind_at)
+      if (estNow >= remindTime) {
+        const msg = REMINDER_MESSAGES[Math.floor(Math.random() * REMINDER_MESSAGES.length)]
+        const result = await sendPush(subscription, JSON.stringify({ title: msg.title, body: msg.body, type: 'reminder' }))
+        if (result === 'stale') staleUsers.push(user_id)
+        else await supabase.from('push_subscriptions').update({ remind_at: null }).eq('user_id', user_id)
+      }
     }))
-
-    // Clear remind_at for all processed users
-    await supabase
-      .from('push_subscriptions')
-      .update({ remind_at: null })
-      .in('user_id', remindSubs.map(s => s.user_id))
-
     if (staleUsers.length > 0) {
       await supabase.from('push_subscriptions').delete().in('user_id', staleUsers)
     }
   }
 
-  // --- Handle daily notification ---
-  const { data: existing } = await supabase
-    .from('daily_schedule')
-    .select('send_at, sent')
-    .eq('date', todayKey)
-    .single()
-
-  let sendAt: Date
-
-  if (!existing) {
-    const randomMinutes = Math.floor(Math.random() * 121)
-    const sendEst = new Date(todayEst)
-    sendEst.setHours(16, randomMinutes, 0, 0)
-    sendAt = new Date(sendEst.toLocaleString('en-US', { timeZone: 'UTC' }))
-    await supabase.from('daily_schedule').insert({
-      date: todayKey,
-      send_at: sendAt.toISOString(),
-      sent: false,
-    })
-  } else if (existing.sent) {
-    return NextResponse.json({ status: 'already_sent_today', reminders: remindSubs?.length ?? 0 })
-  } else {
-    sendAt = new Date(existing.send_at)
-  }
-
-  if (nowUtc < sendAt) {
-    const minutesUntil = Math.round((sendAt.getTime() - nowUtc.getTime()) / 60000)
-    return NextResponse.json({ status: 'not_yet', minutesUntil })
-  }
-
-  await supabase.from('daily_schedule').update({ sent: true }).eq('date', todayKey)
-
-  const { data: subs, error } = await supabase
+  // --- Per-user custom notification times ---
+  // Get all subscriptions with their profiles and couple same_time preference
+  const { data: subs } = await supabase
     .from('push_subscriptions')
-    .select('user_id, subscription')
+    .select(`
+      user_id,
+      subscription,
+      profiles!inner(custom_notif_hour, couple_id),
+      daily_responses(response, date)
+    `)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!subs || subs.length === 0) return NextResponse.json({ sent: 0 })
 
+  // Get couples with same_time_notif
+  const { data: couples } = await supabase
+    .from('couples')
+    .select('id, user1_id, user2_id, same_time_notif')
+
+  const coupleMap: Record<string, any> = {}
+  couples?.forEach(c => { coupleMap[c.id] = c })
+
   const msg = MESSAGES[Math.floor(Math.random() * MESSAGES.length)]
-  const payload = JSON.stringify({ title: msg.title, body: msg.body, type: 'daily' })
-
   let sent = 0
-  const stale: string[] = []
+  const staleUsers: string[] = []
 
-  await Promise.allSettled(subs.map(async ({ user_id, subscription }) => {
-    const result = await sendToUser(subscription, payload)
+  await Promise.allSettled(subs.map(async ({ user_id, subscription, profiles: prof }: any) => {
+    // Check if already responded today
+    const todayResp = prof?.daily_responses?.find((r: any) => r.date === todayKey)
+    if (todayResp) return // already answered today, skip
+
+    // Determine send time for this user
+    let sendMinutes: number
+
+    const coupleId = prof?.couple_id
+    const couple = coupleId ? coupleMap[coupleId] : null
+
+    if (couple?.same_time_notif) {
+      // Use couple's shared time — based on user1's preference
+      const user1Sub = subs.find((s: any) => s.user_id === couple.user1_id)
+      const user1Mins = user1Sub?.profiles?.custom_notif_hour
+      sendMinutes = user1Mins
+        ? (user1Mins > 100 ? user1Mins : user1Mins * 60)
+        : randomInRange(1020, 1200) // default evening
+    } else if (prof?.custom_notif_hour) {
+      // Individual custom time
+      const raw = prof.custom_notif_hour
+      sendMinutes = raw > 100 ? raw : raw * 60 // handle legacy hour format
+    } else {
+      // Default: random within evening window 5-8pm
+      sendMinutes = randomInRange(1020, 1200)
+    }
+
+    // Check if it's time to send
+    if (nowMinutes < sendMinutes) return
+
+    // Check if already sent today (using daily_schedule per user would be ideal
+    // but for now we check if they have a response — if not, send)
+    const payload = JSON.stringify({ title: msg.title, body: msg.body, type: 'daily' })
+    const result = await sendPush(subscription, payload)
     if (result === 'sent') sent++
-    else stale.push(user_id)
+    else if (result === 'stale') staleUsers.push(user_id)
   }))
 
-  if (stale.length > 0) {
-    await supabase.from('push_subscriptions').delete().in('user_id', stale)
+  if (staleUsers.length > 0) {
+    await supabase.from('push_subscriptions').delete().in('user_id', staleUsers)
   }
 
-  return NextResponse.json({ status: 'sent', sent, stale: stale.length })
+  return NextResponse.json({ status: 'done', sent, stale: staleUsers.length, time: nowMinutes })
 }

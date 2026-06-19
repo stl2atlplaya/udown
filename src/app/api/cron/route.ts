@@ -115,7 +115,9 @@ export async function GET(req: NextRequest) {
   let sent = 0
   const staleUsers: string[] = []
 
-  await Promise.allSettled(subs.map(async ({ user_id, subscription, profiles: prof }: any) => {
+  await Promise.allSettled(subs.map(async ({ user_id, subscription, profiles: profRaw }: any) => {
+    const prof = Array.isArray(profRaw) ? profRaw[0] : profRaw
+
     // Check if already responded today
     const todayResp = prof?.daily_responses?.find((r: any) => r.date === todayKey)
     if (todayResp) return // already answered today, skip
@@ -129,7 +131,8 @@ export async function GET(req: NextRequest) {
     if (couple?.same_time_notif) {
       // Use couple's shared time — based on user1's preference
       const user1Sub = subs.find((s: any) => s.user_id === couple.user1_id)
-      const user1Mins = user1Sub?.profiles?.custom_notif_hour
+      const user1Prof = Array.isArray(user1Sub?.profiles) ? user1Sub.profiles[0] : user1Sub?.profiles
+      const user1Mins = user1Prof?.custom_notif_hour
       sendMinutes = user1Mins
         ? (user1Mins > 100 ? user1Mins : user1Mins * 60)
         : randomInRange(1020, 1200) // default evening

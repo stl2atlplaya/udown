@@ -240,9 +240,21 @@ setYesCount(mutualMatches.length)
 
   const handleUpgrade = async (priceId: string) => {
     if (!user || !profile) return
-    const res = await fetch('/api/stripe-checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id, email: user.email, priceId }) })
-    const { url } = await res.json()
-    if (url) window.location.href = url
+    if (!priceId) {
+      alert('Stripe price not configured. Please contact support.')
+      return
+    }
+    try {
+      const res = await fetch('/api/stripe-checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id, email: user.email, priceId }) })
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        alert('Could not start checkout. Please try again.')
+      }
+    } catch (e) {
+      alert('Something went wrong. Please try again.')
+    }
   }
 
   const handleRemovePartner = async () => {

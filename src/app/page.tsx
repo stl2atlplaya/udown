@@ -178,7 +178,8 @@ export default function App() {
         const pid = couple.user1_id === userId ? couple.user2_id : couple.user1_id
         setPartnerId(pid)
         const { data: pp } = await supabase.from('profiles').select('name').eq('id', pid).single()
-        setPartnerName(pp?.name || 'your partner')
+        const savedPartnerName = data?.partner_name || pp?.name || 'your partner'
+        setPartnerName(savedPartnerName)
         const today = new Date().toISOString().split('T')[0]
         const estToday = getEstToday()
         if (couple?.last_match === (estToday || today)) setMatched(true)
@@ -260,7 +261,7 @@ setYesCount(mutualMatches.length)
   if (screen === 'forgot-password') return <ForgotPassword onBack={() => setScreen('login')} />
   if (screen === 'couple-setup') return <CoupleSetup userId={user?.id || ''} generatedCode={generatedCode} setGeneratedCode={setGeneratedCode} inviteCode={inviteCode} setInviteCode={setInviteCode} coupleStatus={coupleStatus} setCoupleStatus={setCoupleStatus} onLinked={() => loadProfile(user!.id)} />
   if (screen === 'upgrade') return <Upgrade profile={profile} onUpgrade={handleUpgrade} onBack={() => setScreen('home')} />
-  if (screen === 'settings') return <Settings profile={profile} partnerName={partnerName} yesCount={yesCount} currentStreak={currentStreak} longestStreak={longestStreak} coupleId={coupleId} premiumData={premiumData} onUpgrade={() => setScreen('upgrade')} onRemovePartner={handleRemovePartner} onBack={() => setScreen('home')} onSaveNotifHour={async (h) => { await fetch('/api/premium', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set-notif-hour', userId: user?.id, hour: h }) }); setProfile(p => p ? { ...p, custom_notif_hour: h } : p) }} onSignOut={async () => { await supabase.auth.signOut(); setScreen('landing'); setProfile(null); setTodayResponse(null); setMatched(false) }} />
+  if (screen === 'settings') return <Settings profile={profile} partnerName={partnerName} yesCount={yesCount} currentStreak={currentStreak} longestStreak={longestStreak} coupleId={coupleId} premiumData={premiumData} onUpgrade={() => setScreen('upgrade')} onRemovePartner={handleRemovePartner} onBack={() => setScreen('home')} onSaveNotifHour={async (mins) => { await fetch('/api/profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user?.id, custom_notif_hour: mins }) }); setProfile(p => p ? { ...p, custom_notif_hour: mins } : p) }} onSignOut={async () => { await supabase.auth.signOut(); setScreen('landing'); setProfile(null); setTodayResponse(null); setMatched(false) }} />
   if (screen === 'home') return (
     <Home
       profile={profile} partnerName={partnerName} todayResponse={todayResponse} todayMood={todayMood}
@@ -506,6 +507,8 @@ function CoupleSetup({ userId, generatedCode, setGeneratedCode, inviteCode, setI
   const [onboardStep, setOnboardStep] = useState(0)
   const [partnerNameInput, setPartnerNameInput] = useState('')
   const [onboardNotifMinutes, setOnboardNotifMinutes] = useState(1140) // default 7pm
+  const [timeWindow, setTimeWindow] = useState('evening')
+  const [sameTime, setSameTime] = useState(false)
 
   // Poll for couple_id — fires after push notification confirms partner joined
   useEffect(() => {
@@ -624,15 +627,12 @@ function CoupleSetup({ userId, generatedCode, setGeneratedCode, inviteCode, setI
   )
 
   // Step 2 — Prompt time
-  const timeWindows = [
+  const timeWindowDefs = [
     { key: 'morning', label: 'Morning', sub: '7 – 10 am', min: 420, max: 600 },
     { key: 'afternoon', label: 'Afternoon', sub: '12 – 3 pm', min: 720, max: 900 },
     { key: 'evening', label: 'Evening', sub: '5 – 8 pm', min: 1020, max: 1200 },
     { key: 'custom', label: 'Custom', sub: 'You choose', min: 420, max: 1380 },
   ]
-  const [timeWindow, setTimeWindow] = useState('evening')
-  const [sameTime, setSameTime] = useState(false)
-
   const formatTime = (mins: number) => {
     const h = Math.floor(mins / 60)
     const m = mins % 60
@@ -647,7 +647,7 @@ function CoupleSetup({ userId, generatedCode, setGeneratedCode, inviteCode, setI
   }
 
   const saveTimeAndContinue = async () => {
-    const win = timeWindows.find(t => t.key === timeWindow)!
+    const win = timeWindowDefs.find(t => t.key === timeWindow)!
     const minutes = timeWindow === 'custom' ? onboardNotifMinutes : randomInWindow(win.min, win.max)
     await fetch('/api/profile', { method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ userId, custom_notif_hour: minutes, partner_name: partnerNameInput.trim() || null }) })
@@ -670,7 +670,7 @@ function CoupleSetup({ userId, generatedCode, setGeneratedCode, inviteCode, setI
         <p style={{fontSize:'0.82rem',color:'#8A847C',marginBottom:'1.5rem',lineHeight:1.75}}>Your partner sets their own time independently.</p>
 
         <div style={{width:'100%',display:'flex',flexDirection:'column' as const,gap:'0.5rem',marginBottom:'1rem'}}>
-          {timeWindows.map(t => (
+          {timeWindowDefs.map(t => (
             <button key={t.key} onClick={() => { setTimeWindow(t.key); if (t.key !== 'custom') setOnboardNotifMinutes(randomInWindow(t.min, t.max)) }}
               style={{width:'100%',padding:'0.8rem 1rem',border:`1px solid ${timeWindow === t.key ? 'rgba(232,165,152,0.4)' : 'rgba(255,255,255,0.08)'}`,background:timeWindow === t.key ? 'rgba(232,165,152,0.08)' : 'none',cursor:'pointer',display:'flex',justifyContent:'space-between' as const,alignItems:'center' as const,transition:'all 0.2s'}}>
               <span style={{fontSize:'0.85rem',color:timeWindow === t.key ? '#F5F0E8' : '#8A847C'}}>{t.label}</span>

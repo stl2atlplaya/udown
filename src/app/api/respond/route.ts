@@ -38,7 +38,6 @@ export async function POST(req: NextRequest) {
   const estHour = parseInt(new Date().toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false }))
   const today = estHour >= 6 ? estDate : new Date(Date.now() - 86400000).toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
 
-  console.log('respond: userId', userId, 'response', response, 'today', today)
 
   const { data: profile } = await supabase
     .from('profiles').select('couple_id').eq('id', userId).single()
@@ -69,14 +68,12 @@ export async function POST(req: NextRequest) {
     .from('daily_responses').select('response, mood')
     .eq('user_id', partnerId).eq('date', today).single()
 
-  console.log('respond: partnerResponse', partnerResponse?.response, 'last_match', couple.last_match, 'today', today)
 
   if (response === 'yes' && partnerResponse?.response === 'yes') {
     // Normalize last_match to YYYY-MM-DD for comparison
     const lastMatch = couple.last_match ? String(couple.last_match).slice(0, 10) : null
 
-    console.log('respond: MATCH! lastMatch', lastMatch, 'today', today, 'will notify:', lastMatch !== today)
-
+  
     if (lastMatch !== today) {
       await supabase.from('couples').update({ last_match: today }).eq('id', profile.couple_id)
 
@@ -86,8 +83,7 @@ export async function POST(req: NextRequest) {
 
       await sendMatchNotification(userId, partnerId, sharedMoods)
     } else {
-      console.log('respond: already matched today, skipping notification')
-    }
+        }
 
     return NextResponse.json({ success: true, matched: true })
   }
@@ -101,11 +97,9 @@ async function sendMatchNotification(user1Id: string, user2Id: string, sharedMoo
     .select('user_id, subscription')
     .in('user_id', [user1Id, user2Id])
 
-  console.log('sendMatchNotification: found', subs?.length, 'subscriptions for', user1Id, user2Id)
 
   if (!subs || subs.length === 0) {
-    console.log('sendMatchNotification: NO SUBSCRIPTIONS FOUND — this is why notifications are not being sent')
-    return
+      return
   }
 
   const msg = MATCH_MESSAGES[Math.floor(Math.random() * MATCH_MESSAGES.length)]
@@ -123,9 +117,8 @@ async function sendMatchNotification(user1Id: string, user2Id: string, sharedMoo
   await Promise.allSettled(subs.map(async ({ user_id, subscription }) => {
     try {
       await webpush.sendNotification(JSON.parse(subscription), payload)
-      console.log('sendMatchNotification: sent to', user_id)
-    } catch (err: any) {
-      console.error('sendMatchNotification: failed for', user_id, 'status:', err.statusCode, 'body:', err.body)
+        } catch (err: any) {
+      // Stale subscription handled below
       if (err.statusCode === 410) stale.push(user_id)
     }
   }))

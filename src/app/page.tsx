@@ -250,7 +250,7 @@ setYesCount(mutualMatches.length)
       if (data.url) {
         window.location.href = data.url
       } else {
-        alert('Could not start checkout. Please try again.')
+        alert(data.error || 'Could not start checkout. Please try again.')
       }
     } catch (e) {
       alert('Something went wrong. Please try again.')
